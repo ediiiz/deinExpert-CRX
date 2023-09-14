@@ -7,7 +7,7 @@
   }
 
   type modalState = 'open' | 'close';
-  let state: modalState = 'open';
+  let state: modalState = 'close';
 </script>
 
 <div class="fixed bottom-4 left-0 z-9999 text-white w-screen">
