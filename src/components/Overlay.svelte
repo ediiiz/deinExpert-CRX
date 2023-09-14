@@ -1,26 +1,27 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { storage } from '../storage';
+  import { fade, fly } from 'svelte/transition';
   import Options from './Options.svelte';
 
-  let count = 0;
+  function switchModal() {
+    state == 'open' ? (state = 'close') : (state = 'open');
+  }
 
-  onMount(() => {
-    storage.get().then((storage) => (count = storage.count));
-  });
+  type modalState = 'open' | 'close';
+  let state: modalState = 'open';
 </script>
 
-<div class="overlay bg-black z-36">
-  <Options {count} />
+<div class="fixed bottom-4 left-0 z-9999 text-white w-screen">
+  <div class="flex place-content-center">
+    <button class="p-4 bg-dark rounded-4 shadow-dark shadow-2xl" on:click={switchModal}>
+      <div class="i-fluent-mdl2-collapse-menu text-2xl" />
+    </button>
+  </div>
 </div>
 
-<style>
-  .overlay {
-    position: fixed;
-    width: 300px;
-    top: 16px;
-    left: 16px;
-    border: 1px solid black;
-    padding: 16px;
-  }
-</style>
+{#if state == 'open'}
+  <div transition:fade={{ duration: 200, delay: 100 }}>
+    <div class="fixed top-10 left-0 z-9999 bg-white text-black w-screen h-80vh border-2 rounded-2 p-4">
+      <Options />
+    </div>
+  </div>
+{/if}
