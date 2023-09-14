@@ -172,7 +172,7 @@
   const storeDataHandler = new StoreDataHandler();
 </script>
 
-<div class="flex place-content-center">
+<div class="flex place-content-center pb-4">
   <button
     class="p-4 bg-dark rounded-4 shadow-dark shadow-2xl text-white"
     on:click={() => storeDataHandler.startNewSearch()}
@@ -188,13 +188,13 @@
   <span>{$progressStore.current}/{$progressStore.total} processed</span>
 </div>
 
-<div class="max-w-100%">
-  <table class="h-400px w-100% block border-collapse">
+<div class="h-80% overflow-auto grid grid-cols-1">
+  <table>
     <thead>
       <tr>
-        <th>Price (Gross)</th>
-        <th>Online Store</th>
-        <th>Stock</th>
+        <th class="sticky top-0 bg-white z-10">Price (Gross)</th>
+        <th class="sticky top-0 bg-white z-10">Online Store</th>
+        <th class="sticky top-0 bg-white z-10">Stock</th>
         <!-- Add other headers as needed -->
       </tr>
     </thead>
@@ -248,18 +248,6 @@
 </div>
 
 <style>
-  table {
-    overflow: auto;
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: fixed; /* vertical scrolling */
-    box-sizing: border-box;
-  }
-
-  table::-webkit-scrollbar {
-    display: none;
-  }
-
   th,
   td {
     padding: 8px 12px;
