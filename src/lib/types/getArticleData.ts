@@ -41,6 +41,7 @@ export type ProductData = {
   itemOnDisplayDescription: null | string;
   wandaData: null | any; // You can replace 'any' with a more specific type if known
   expertTags: string[] | null;
+  priceInclShipping?: number;
   onlineShipment: {
     type: string;
     price: {
