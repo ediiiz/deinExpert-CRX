@@ -105,7 +105,7 @@ export class StoreDataHandler {
 
   startNewSearch() {
     progressStore.update(() => ({
-      status: 'running',
+      status: 'restarted',
       current: 0,
       total: 0,
     }));
@@ -113,15 +113,14 @@ export class StoreDataHandler {
     this.products = [];
     productsStore.set(this.products);
     // set progesStore status to restarted
+    this.isSearchCancelled = false;
+    this.abortController = new AbortController();
+    this.fetchData();
     progressStore.update(() => ({
-      status: 'restarted',
+      status: 'running',
       current: 0,
       total: 0,
     }));
-
-    this.isSearchCancelled = false;
-    this.abortController = new AbortController();
-    this.fetchData(); 
   }
 
   cancelSearch() {

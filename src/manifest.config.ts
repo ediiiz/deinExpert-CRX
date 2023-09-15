@@ -47,5 +47,5 @@ export default defineManifest(async (env) => ({
             "128": "src/assets/icons/icon-128.png",
         },
     },
-    permissions: ["storage", "sidePanel"] as chrome.runtime.ManifestPermissions[],
+    permissions: ["storage", "sidePanel", "activeTab", "tabs"] as chrome.runtime.ManifestPermissions[],
 }));

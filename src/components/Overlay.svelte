@@ -5,7 +5,6 @@
   function switchModal() {
     state == 'open' ? (state = 'close') : (state = 'open');
   }
-
   type modalState = 'open' | 'close';
   let state: modalState = 'close';
 </script>
