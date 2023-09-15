@@ -19,8 +19,10 @@
 </div>
 
 {#if state == 'open'}
-  <div transition:fade={{ duration: 200, delay: 100 }}>
-    <div class="fixed top-10 left-0 z-9999 bg-white text-black w-screen h-80vh border-2 rounded-2 p-4">
+  <div transition:fade={{ duration: 200 }}>
+    <div
+      class="fixed top-10 right-0 z-9999 bg-white text-black w-screen h-500px border-2 rounded-2 p-4 sm:max-w-sm sm:right-6 md:max-w-md 3xl:max-w-2xl"
+    >
       <Options />
     </div>
   </div>
