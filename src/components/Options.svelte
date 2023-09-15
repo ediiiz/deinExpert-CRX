@@ -1,12 +1,16 @@
 <script lang="ts">
+  import { fade } from 'svelte/transition';
   import expertStores, { type ExpertStores } from '../lib/expertStore';
   import type { ProductData } from '../lib/types/getArticleData';
   import { writable } from 'svelte/store';
+
+  type progessStatus = 'stopped' | 'running' | 'stoppedByUser';
 
   const productsStore = writable<ProductData[]>([]);
   const progressStore = writable({
     current: 0,
     total: 0,
+    status: 'stopped' as progessStatus,
   });
 
   class StoreDataHandler {
@@ -98,12 +102,22 @@
     }
 
     startNewSearch() {
+      progressStore.update(() => ({
+        status: 'running',
+        current: 0,
+        total: 0,
+      }));
       this.isSearchCancelled = false;
       this.abortController = new AbortController();
       this.fetchData(); // Or whatever starting function you want
     }
 
     cancelSearch() {
+      progressStore.update(() => ({
+        status: 'stoppedByUser',
+        current: 0,
+        total: 0,
+      }));
       this.isSearchCancelled = true;
 
       if (this.abortController) {
@@ -172,82 +186,112 @@
   const storeDataHandler = new StoreDataHandler();
 </script>
 
-<div class="flex place-content-center pb-4">
-  <button
-    class="p-4 bg-dark rounded-4 shadow-dark shadow-2xl text-white"
-    on:click={() => storeDataHandler.startNewSearch()}
-  >
-    Start
-  </button>
-  <button
-    class="p-4 bg-dark rounded-4 shadow-dark shadow-2xl text-white"
-    on:click={() => storeDataHandler.cancelSearch()}
-  >
-    Cancel
-  </button>
-  <span>{$progressStore.current}/{$progressStore.total} processed</span>
+<div class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-9999">
+  {#if $progressStore.status !== 'running'}
+    <button
+      transition:fade={{ duration: 200 }}
+      class="p-4 bg-dark rounded-t-2 shadow-dark shadow-2xl text-white"
+      on:click={() => storeDataHandler.startNewSearch()}
+    >
+      Start
+    </button>
+  {:else}
+    <button
+      transition:fade={{ duration: 200 }}
+      class="p-4 bg-dark rounded-t-2 shadow-dark shadow-2xl text-white"
+      on:click={() => storeDataHandler.cancelSearch()}
+    >
+      Cancel
+    </button>
+  {/if}
 </div>
+{#if $progressStore.status === 'running' && $progressStore.total !== 0}
+  <div class="relative -top-0.5 z-9999">
+    <div class="h-1 w-full bg-neutral-200 dark:bg-neutral-600">
+      <div class="h-1 bg-primary" style="width: {($progressStore.current / $progressStore.total) * 100}%" />
+    </div>
+  </div>
+{/if}
 
-<div class="h-80% overflow-auto grid grid-cols-1">
-  <table>
-    <thead>
-      <tr>
-        <th class="sticky top-0 bg-white z-10">Price (Gross)</th>
-        <th class="sticky top-0 bg-white z-10">Online Store</th>
-        <th class="sticky top-0 bg-white z-10">Stock</th>
-        <!-- Add other headers as needed -->
-      </tr>
-    </thead>
-    <tbody>
-      {#each $productsStore as product (product.onlineStore)}
+{#if $progressStore.status !== 'stopped'}
+  <div id="table-container" class="h-80% overflow-auto grid grid-cols-1 shadow-inset rounded-b-2">
+    <table>
+      <thead>
         <tr>
-          <td>{product.price?.gross || 'N/A'}</td>
-          <td>{product.onlineStore}</td>
-          <td>{product.stock}</td>
-          <!-- Add other columns as needed -->
+          <th class="sticky top-0 bg-white z-10">Price (Gross)</th>
+          <th class="sticky top-0 bg-white z-10">Online Store</th>
+          <th class="sticky top-0 bg-white z-10">Stock</th>
+          <!-- Add other headers as needed -->
         </tr>
-      {/each}
-      <tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">31826557</td> <td class="s-ZclnAN89mjA8">0</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907106</td> <td class="s-ZclnAN89mjA8">1</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907035</td> <td class="s-ZclnAN89mjA8">0</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907554</td> <td class="s-ZclnAN89mjA8">1</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">31826556</td> <td class="s-ZclnAN89mjA8">0</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907398</td> <td class="s-ZclnAN89mjA8">1</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">554.98</td> <td class="s-ZclnAN89mjA8">29938844</td>
-        <td class="s-ZclnAN89mjA8">1</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">554.98</td> <td class="s-ZclnAN89mjA8">29703322</td>
-        <td class="s-ZclnAN89mjA8">3</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">554.98</td> <td class="s-ZclnAN89mjA8">31826547</td>
-        <td class="s-ZclnAN89mjA8">1</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">562.98</td> <td class="s-ZclnAN89mjA8">31826550</td>
-        <td class="s-ZclnAN89mjA8">2</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">588</td> <td class="s-ZclnAN89mjA8">35880019</td> <td class="s-ZclnAN89mjA8">4</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">598.99</td> <td class="s-ZclnAN89mjA8">1907185</td>
-        <td class="s-ZclnAN89mjA8">0</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">598.99</td> <td class="s-ZclnAN89mjA8">1906930</td>
-        <td class="s-ZclnAN89mjA8">0</td>
-      </tr><tr class="s-ZclnAN89mjA8"
-        ><td class="s-ZclnAN89mjA8">598.99</td> <td class="s-ZclnAN89mjA8">1907585</td>
-        <td class="s-ZclnAN89mjA8">1</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+      </thead>
+      <tbody>
+        {#each $productsStore as product (product.onlineStore)}
+          <tr transition:fade={{ duration: 200 }}>
+            <td>{product.price?.gross || 'N/A'}</td>
+            <td>{product.onlineStore}</td>
+            <td>{product.stock}</td>
+            <!-- Add other columns as needed -->
+          </tr>
+        {/each}
+        {#if false}
+          <tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">31826557</td>
+            <td class="s-ZclnAN89mjA8">0</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907106</td>
+            <td class="s-ZclnAN89mjA8">1</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907035</td>
+            <td class="s-ZclnAN89mjA8">0</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907554</td>
+            <td class="s-ZclnAN89mjA8">1</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">31826556</td>
+            <td class="s-ZclnAN89mjA8">0</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">519</td> <td class="s-ZclnAN89mjA8">1907398</td>
+            <td class="s-ZclnAN89mjA8">1</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">554.98</td> <td class="s-ZclnAN89mjA8">29938844</td>
+            <td class="s-ZclnAN89mjA8">1</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">554.98</td> <td class="s-ZclnAN89mjA8">29703322</td>
+            <td class="s-ZclnAN89mjA8">3</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">554.98</td> <td class="s-ZclnAN89mjA8">31826547</td>
+            <td class="s-ZclnAN89mjA8">1</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">562.98</td> <td class="s-ZclnAN89mjA8">31826550</td>
+            <td class="s-ZclnAN89mjA8">2</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">588</td> <td class="s-ZclnAN89mjA8">35880019</td>
+            <td class="s-ZclnAN89mjA8">4</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">598.99</td> <td class="s-ZclnAN89mjA8">1907185</td>
+            <td class="s-ZclnAN89mjA8">0</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">598.99</td> <td class="s-ZclnAN89mjA8">1906930</td>
+            <td class="s-ZclnAN89mjA8">0</td>
+          </tr><tr class="s-ZclnAN89mjA8"
+            ><td class="s-ZclnAN89mjA8">598.99</td> <td class="s-ZclnAN89mjA8">1907585</td>
+            <td class="s-ZclnAN89mjA8">1</td>
+          </tr>
+        {/if}
+      </tbody>
+    </table>
+  </div>
+{/if}
 
 <style>
+  .tw-container > * {
+    grid-area: 1 / 1;
+  }
+  #table-container {
+    -moz-box-shadow: inset 0 -10px 10px -10px rgba(17, 17, 17, 0.322);
+    -webkit-box-shadow: inset 0 -10px 10px -10px rgba(17, 17, 17, 0.322);
+    box-shadow: inset 0 -10px 20px -10px rgba(17, 17, 17, 0.322);
+  }
   th,
   td {
     padding: 8px 12px;
