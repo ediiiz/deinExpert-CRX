@@ -31,15 +31,7 @@ export default defineManifest(async (env) => ({
     background: {
         service_worker: "src/background/index.ts",
     },
-    options_ui: {
-        page: "src/options/options.html",
-        open_in_tab: false,
-    },
-    side_panel: {
-        default_path: "src/sidepanel/sidepanel.html",
-    },
     action: {
-        default_popup: "src/popup/popup.html",
         default_icon: {
             "16": "src/assets/icons/icon-16.png",
             "32": "src/assets/icons/icon-32.png",

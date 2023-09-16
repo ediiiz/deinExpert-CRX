@@ -1,6 +1,6 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
-  import Options from './Options.svelte';
+  import DeinExpert from './deinExpert.svelte';
 
   function switchModal() {
     state == 'open' ? (state = 'close') : (state = 'open');
@@ -22,7 +22,7 @@
     <div
       class="fixed top-10 right-0 z-9999 bg-white text-black w-screen h-500px border-2 rounded-2 p-4 sm:max-w-sm sm:right-6 md:max-w-md 3xl:max-w-2xl"
     >
-      <Options />
+      <DeinExpert />
     </div>
   </div>
 {/if}

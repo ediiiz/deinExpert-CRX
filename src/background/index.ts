@@ -1,11 +1,5 @@
-import { storage } from "../storage";
-
 // Background service workers
 // https://developer.chrome.com/docs/extensions/mv3/service_workers/
-
-chrome.runtime.onInstalled.addListener(() => {
-    storage.get().then(console.log);
-});
 
 function getExtensionUrl(filename: string) {
     const url = chrome.runtime.getURL(filename);

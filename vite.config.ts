@@ -6,7 +6,7 @@ import UnoCSS from '@unocss/svelte-scoped/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [UnoCSS(), svelte(), crx({ manifest })],
+    plugins: [UnoCSS(), svelte({ emitCss: false }), crx({ manifest })],
     publicDir: "./src/public",
     // HACK: https://github.com/crxjs/chrome-extension-tools/issues/696
     // https://github.com/crxjs/chrome-extension-tools/issues/746
