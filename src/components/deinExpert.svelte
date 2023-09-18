@@ -15,6 +15,11 @@
     }
   }
 
+  // create a promise based sleep function
+  function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   function createAffiliate(awinlink: string | void, branchId: string): string {
     const url = window.location.href.split('?');
     return `${awinlink}&p=` + encodeURIComponent(`${url[0]}?branch_id=e_${branchId}`);
@@ -31,6 +36,11 @@
     class="p-4 grid justify-center items-center text-center bg-red rounded-2 mb-2"
   >
     <p>Etwas ist schief gelaufen! Artikel ID nicht gefunden.</p>
+    <p>Bitte alle Expert Cookies in 5 Sekunden zulassen!</p>
+    <!-- svelte-ignore missing-declaration -->
+    {#await sleep(5000) then}
+      <button class="h-0 w-0" on:click={window.Cookiebot.renew()} />
+    {/await}
   </div>
 {/if}
 
@@ -61,7 +71,36 @@
   </div>
 {/if}
 
-{#if $progressStore.status !== 'ready'}
+{#if $progressStore.status === 'ready' || $progressStore.status === 'error-articleId' || $progressStore.status === 'error-searchTooFast'}
+  <div class="pt-4 grid justify-center items-center text-center">
+    <p class="bg-primary rounded-2 p-4">Orange markierte Einträge sind {@html '<strong>Aussteller</strong>'}!</p>
+    {#if $progressStore.status === 'error-searchTooFast'}
+      <div
+        transition:fade={{ duration: 500 }}
+        class="p-4 grid justify-center items-center text-center bg-red rounded-2 my-4"
+      >
+        <p class="pb-4">In den letzten 10 Minuten wurde dieser Artikel bereits von jemanden gesucht.</p>
+        <a
+          class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
+          href="https://dein.Expert/product/{storeDataHandler.Webcode}"
+          target="_blank">Link zum Suchergebniss</a
+        >
+      </div>
+    {:else}
+      <div
+        transition:fade={{ duration: 500 }}
+        class="p-4 grid justify-center items-center text-center bg-neutral-200 rounded-2 my-4"
+      >
+        <p class="pb-4">Sobald die Suche abgeschlossen ist kannst du die Preise hier finden:</p>
+        <a
+          class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
+          href="https://dein.Expert/product/{storeDataHandler.Webcode}"
+          target="_blank">Link zum Produkt</a
+        >
+      </div>
+    {/if}
+  </div>
+{:else}
   <div id="table-container" class="h-80% overflow-auto grid grid-cols-1 shadow-inset rounded-b-2">
     <table>
       <thead>
@@ -97,15 +136,6 @@
         {/if}
       </tbody>
     </table>
-  </div>
-{:else}
-  <div class="pt-4 grid justify-center items-center text-center">
-    <p class="pb-4">Drücke einfach auf Start um die Suche zu starten!</p>
-    <p class="bg-primary rounded-2 p-4">Orange markierte Einträge sind {@html '<strong>Aussteller</strong>'}!</p>
-    <p class="pt-4">Sobald die Suche abgeschlossen ist kannst du die Preise hier finden:</p>
-    <button class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-      ><a href="https://dein.Expert/product/{storeDataHandler.Webcode}" target="_blank">Link zum Produkt</a>
-    </button>
   </div>
 {/if}
 

@@ -7,7 +7,7 @@ const productApi = 'https://dein.expert/api/product' as const;
 
 import type { product } from './types/deinExpertApi';
 
-type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId';
+type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId' | 'error-searchTooFast';
 
 export const productsStore = writable<ProductData[]>([]);
 export const progressStore = writable({
@@ -45,6 +45,27 @@ export class StoreDataHandler {
     this.unsubscribe();
   }
 
+  public async checkIfProductAlreadySearched(): Promise<boolean> {
+    const response = await fetch(`${productApi}/${this.Webcode}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    if (data.success) {
+      const lastDate = new Date(data.product.priceHistory[0].date);
+      const now = new Date();
+      const lastDateUTC = Date.UTC(lastDate.getUTCFullYear(), lastDate.getUTCMonth(), lastDate.getUTCDate(), lastDate.getUTCHours(), lastDate.getUTCMinutes(), lastDate.getUTCSeconds());
+      const nowUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
+      const diff = nowUTC - lastDateUTC;
+      const diffMinutes = Math.floor(diff / 1000 / 60);
+      if (diffMinutes < 10) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+
   public get Webcode(): string {
     this.dataWebcode = document
       .querySelector(
@@ -56,6 +77,17 @@ export class StoreDataHandler {
 
   async fetchData() {
     try {
+
+      //implement a check if the product was already searched in the last 10 minutes
+      const alreadySearched = await this.checkIfProductAlreadySearched();
+      if (alreadySearched) {
+        progressStore.update(value => ({
+          ...value,
+          status: 'error-searchTooFast',
+        }));
+        return;
+      }
+
       // Fetch dataExpertStore
       this.dataExpertStore = await expertStores().then((expertStores) => {
         const seenStoreIds = new Set<string>();
@@ -77,7 +109,7 @@ export class StoreDataHandler {
       this.dataMobile = document.querySelector('#mobileVersion > div')?.getAttribute('data-bv-product-id')!;
 
       // Continue processing the data
-      if (this.dataDesktop || this.dataMobile) {
+      if ((this.dataDesktop || this.dataMobile) && !alreadySearched) {
         this.processData();
       } else {
         console.error('No product ID found on the website');
@@ -217,7 +249,6 @@ export class StoreDataHandler {
         return productData;
       }
       // replace the returned storeid with the passed storeid
-      console.log(productData.onlineButtonAction);
 
       productData.showStoreName = storeName;
       productData.onlineStore = storeId;
