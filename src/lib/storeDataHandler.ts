@@ -1,36 +1,57 @@
 import type { ProductData } from '../lib/types/getArticleData';
 import expertStores, { type ExpertStores } from '../lib/expertStore';
 import { writable } from 'svelte/store';
+import { getLinkomatAwin } from './cashback/linkomat';
 
-type progessStatus = 'stopped' | 'running' | 'stoppedByUser' | 'restarted';
+const productApi = 'https://dein.expert/api/product' as const;
+
+import type { product } from './types/deinExpertApi';
+
+type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId';
 
 export const productsStore = writable<ProductData[]>([]);
 export const progressStore = writable({
   current: 0,
   total: 0,
-  status: 'stopped' as progessStatus,
+  status: 'ready' as progessStatus,
 });
 
 export class StoreDataHandler {
   products: ProductData[] = [];
   private dataExpertStore: ExpertStores | null = null;
   private reactiveDataExpertStores: ExpertStores | null = null;
-  private dataWebcodeMobile: string | undefined = undefined;
+  private dataWebcode: string | undefined = undefined;
   private dataDesktop: string | undefined = undefined;
   private dataMobile: string | undefined = undefined;
   private fetchInterval: number = 200; // 200 milliseconds (5 requests per second)
   private abortController: AbortController | null = null;
   private isSearchCancelled: boolean = false;
+  private unsubscribe: () => void;
 
-  // constructor() {}
+  constructor() {
+    progressStore.update(value => ({
+      ...value,
+      status: 'ready'
+    }));
+    // Assuming this class has a constructor, initialize the subscription here
+    this.unsubscribe = progressStore.subscribe((value) => {
+      if (value.status === 'finished') {
+        this.uploadData();
+      }
+    });
+  }
+
+  public ngOnDestroy() { // Or a similar destructor method
+    this.unsubscribe();
+  }
 
   public get Webcode(): string {
-    this.dataWebcodeMobile = document
+    this.dataWebcode = document
       .querySelector(
         '#__nuxt > main > div > div.lg\\:container.lg\\:mx-auto.flex.flex-col.gap-y-4 > div.grid.grid-cols-12.gap-4.lg\\:gap-12 > div.col-span-12.lg\\:col-span-9 > div'
       )
       ?.innerHTML?.replace('Web-Code: ', '');
-    return this.dataWebcodeMobile!;
+    return this.dataWebcode!;
   }
 
   async fetchData() {
@@ -47,9 +68,6 @@ export class StoreDataHandler {
         });
       });
 
-      // Use the fetched data within the fetchData method
-      console.log(this.dataExpertStore);
-
       // Extract values from the website's DOM
       this.dataDesktop = document
         .querySelector(
@@ -59,7 +77,18 @@ export class StoreDataHandler {
       this.dataMobile = document.querySelector('#mobileVersion > div')?.getAttribute('data-bv-product-id')!;
 
       // Continue processing the data
-      this.processData();
+      if (this.dataDesktop || this.dataMobile) {
+        this.processData();
+      } else {
+        console.error('No product ID found on the website');
+        // update store to show error
+        progressStore.update(value => ({
+          ...value,
+          status: 'error-articleId',
+        }));
+      }
+
+
     } catch (error) {
       // Handle any errors that may occur during the fetch operation or DOM manipulation
       console.error('Error fetching data:', error);
@@ -81,26 +110,38 @@ export class StoreDataHandler {
       ...value,
       current: 0,
       total: this.dataExpertStore!.length,
+      status: 'processing'
     }));
 
-    for (let index = 0; index < this.dataExpertStore.length; index++) {
-      if (this.isSearchCancelled) break; // Exit loop if search is cancelled
+    let wasCancelled = false;
 
+    for (let index = 0; index < this.dataExpertStore.length; index++) {
+      if (this.isSearchCancelled) {
+        wasCancelled = true;
+        break;
+      }
       const shop = this.dataExpertStore[index];
       const storeId = shop.store.storeId;
 
       // Use a Promise to introduce the delay
       await new Promise((resolve) => setTimeout(resolve, this.fetchInterval));
 
-      if (this.isSearchCancelled) break; // Check again before fetching
+      if (this.isSearchCancelled) {
+        wasCancelled = true;
+        break;
+      }
 
-      this.fetchProductInformation(storeId);
+      this.fetchProductInformation(storeId, shop.store.name);
 
       progressStore.update((value) => ({
         ...value,
         current: value.current + 1,
       }));
     }
+    progressStore.update(value => ({
+      ...value,
+      status: wasCancelled ? 'cancelled' : 'finished'
+    }));
   }
 
   startNewSearch() {
@@ -117,7 +158,7 @@ export class StoreDataHandler {
     this.abortController = new AbortController();
     this.fetchData();
     progressStore.update(() => ({
-      status: 'running',
+      status: 'processing',
       current: 0,
       total: 0,
     }));
@@ -125,10 +166,11 @@ export class StoreDataHandler {
 
   cancelSearch() {
     progressStore.update(() => ({
-      status: 'stoppedByUser',
+      status: 'cancelled',
       current: 0,
       total: 0,
     }));
+
     this.isSearchCancelled = true;
 
     if (this.abortController) {
@@ -137,7 +179,14 @@ export class StoreDataHandler {
     }
   }
 
-  private async fetchProductInformation(storeId: string): Promise<ProductData | undefined> {
+  public async fetchCashbackLink(): Promise<string | void> {
+    const awinLink = await getLinkomatAwin();
+    if (awinLink) {
+      return awinLink;
+    }
+  }
+
+  private async fetchProductInformation(storeId: string, storeName: string): Promise<ProductData | undefined> {
     this.abortController = new AbortController();
     try {
       // Construct the body for the fetch request
@@ -164,11 +213,13 @@ export class StoreDataHandler {
       // Parse the response as ProductData type
       const productData: ProductData = await response.json();
       // Push to the products array and sort by price
-      if (!productData.price?.gross) {
+      if (!productData.price?.gross || productData.onlineButtonAction !== 'ORDER') {
         return productData;
       }
-
       // replace the returned storeid with the passed storeid
+      console.log(productData.onlineButtonAction);
+
+      productData.showStoreName = storeName;
       productData.onlineStore = storeId;
       productData.priceInclShipping = productData.price.gross + productData.onlineShipment[0]?.price?.gross;
       if (!productData.priceInclShipping) return productData;
@@ -190,4 +241,40 @@ export class StoreDataHandler {
       return undefined;
     }
   }
+
+  public async uploadData() {
+    const aggregatedProduct: product = {
+      webcode: this.Webcode,
+      url: window.location.href.split('?')[0],
+      price: []
+    };
+
+    this.products.forEach((product) => {
+      aggregatedProduct.price.push({
+        price: product.priceInclShipping!,
+        branchName: product.showStoreName!,
+        branchId: parseInt(product.onlineStore),
+      });
+    });
+
+    if (aggregatedProduct.price.length === 0) return;
+
+    const requestBody = JSON.stringify(aggregatedProduct);
+    const response = await fetch(productApi, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+      },
+      body: requestBody,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(data);
+  }
+
 }
