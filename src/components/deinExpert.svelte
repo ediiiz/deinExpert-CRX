@@ -33,18 +33,26 @@
 {#if $progressStore.status === 'error-articleId'}
   <div
     transition:fade={{ duration: 500 }}
-    class="p-4 grid justify-center items-center text-center bg-red rounded-2 mb-2"
+    class="fixed top-2 right-2 p-4 grid justify-center items-center text-center bg-red rounded-2"
   >
-    <p>Etwas ist schief gelaufen! Artikel ID nicht gefunden.</p>
-    <p>Bitte alle Expert Cookies in 5 Sekunden zulassen!</p>
+    <p>Alle Expert Cookies zulassen!</p>
     <!-- svelte-ignore missing-declaration -->
-    {#await sleep(5000) then}
+    {#await storeDataHandler.sleep(2000) then}
       <button class="h-0 w-0" on:click={window.Cookiebot.renew()} />
     {/await}
   </div>
 {/if}
 
-<div class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-9999">
+{#if $progressStore.status === 'finished'}
+  <div
+    transition:fade={{ duration: 500 }}
+    class="fixed top-2 right-2 p-4 grid justify-center items-center text-center bg-green rounded-2 mb-2"
+  >
+    <p>Upload erfolgreich.</p>
+  </div>
+{/if}
+
+<div class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-11">
   {#if $progressStore.status === 'processing'}
     <button
       transition:fade={{ duration: 200 }}
@@ -64,7 +72,7 @@
   {/if}
 </div>
 {#if $progressStore.status === 'processing' && $progressStore.total !== 0}
-  <div class="relative -top-0.5 z-9999">
+  <div class="relative -top-0.5 z-11">
     <div class="h-1 w-full bg-neutral-200 dark:bg-neutral-600">
       <div class="h-1 bg-primary" style="width: {($progressStore.current / $progressStore.total) * 100}%" />
     </div>

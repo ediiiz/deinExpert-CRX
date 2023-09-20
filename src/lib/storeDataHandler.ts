@@ -118,6 +118,14 @@ export class StoreDataHandler {
           ...value,
           status: 'error-articleId',
         }));
+
+        await this.sleep(2000).then(() => {
+          progressStore.update(value => ({
+            ...value,
+            status: 'ready',
+          }));
+        }
+        );
       }
 
 
@@ -130,7 +138,11 @@ export class StoreDataHandler {
   private processData() {
     // Perform further operations with the fetched data here
     console.log('Processing data:', this.dataExpertStore);
-
+    progressStore.update(() => ({
+      status: 'processing',
+      current: 0,
+      total: 0,
+    }));
     // You can use the data here or call other methods as needed
     this.processStores();
   }
@@ -178,7 +190,7 @@ export class StoreDataHandler {
 
   startNewSearch() {
     progressStore.update(() => ({
-      status: 'restarted',
+      status: 'ready',
       current: 0,
       total: 0,
     }));
@@ -189,11 +201,6 @@ export class StoreDataHandler {
     this.isSearchCancelled = false;
     this.abortController = new AbortController();
     this.fetchData();
-    progressStore.update(() => ({
-      status: 'processing',
-      current: 0,
-      total: 0,
-    }));
   }
 
   cancelSearch() {
@@ -285,6 +292,7 @@ export class StoreDataHandler {
         price: product.priceInclShipping!,
         branchName: product.showStoreName!,
         branchId: parseInt(product.onlineStore),
+        aussteller: product.itemOnDisplay,
       });
     });
 
@@ -306,6 +314,17 @@ export class StoreDataHandler {
 
     const data = await response.json();
     console.log(data);
+
+    await this.sleep(2000).then(() => {
+      progressStore.update(value => ({
+        ...value,
+        status: 'processing',
+      }));
+    });
   }
 
+  public async sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
 }
+

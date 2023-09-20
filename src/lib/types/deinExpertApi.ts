@@ -5,5 +5,6 @@ export type product = {
     price: number;
     branchName: string;
     branchId: number;
+    aussteller: boolean;
   }[];
 };
