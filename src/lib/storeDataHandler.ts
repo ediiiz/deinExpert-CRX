@@ -3,11 +3,12 @@ import expertStores, { type ExpertStores } from '../lib/expertStore';
 import { writable } from 'svelte/store';
 import { getLinkomatAwin } from './cashback/linkomat';
 
-const productApi = 'https://dein.expert/api/product' as const;
+const GET_EXPERT_ARTICLE_URL: string = import.meta.env.VITE_EXPERT_GET_ARTICLE_URL as string;
+const DEINEXPERT_PRODUCT_URL: string = import.meta.env.VITE_DEINEXPERT_PRODUCT_URL as string;
 
 import type { product } from './types/deinExpertApi';
 
-type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId' | 'error-searchTooFast';
+type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId' | 'error-searchTooFast' | 'loading'
 
 export const productsStore = writable<ProductData[]>([]);
 export const progressStore = writable({
@@ -26,6 +27,7 @@ export class StoreDataHandler {
   private fetchInterval: number = 200; // 200 milliseconds (5 requests per second)
   private abortController: AbortController | null = null;
   private isSearchCancelled: boolean = false;
+  private awinLink: string | undefined = undefined;
   private unsubscribe: () => void;
 
   constructor() {
@@ -46,7 +48,7 @@ export class StoreDataHandler {
   }
 
   public async checkIfProductAlreadySearched(): Promise<boolean> {
-    const response = await fetch(`${productApi}/${this.Webcode}`);
+    const response = await fetch(`${DEINEXPERT_PRODUCT_URL}/${this.Webcode}`);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -58,7 +60,7 @@ export class StoreDataHandler {
       const nowUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
       const diff = nowUTC - lastDateUTC;
       const diffMinutes = Math.floor(diff / 1000 / 60);
-      if (diffMinutes < 10) {
+      if (diffMinutes < 60) {
         return true;
       }
     }
@@ -78,6 +80,11 @@ export class StoreDataHandler {
   async fetchData() {
     try {
 
+      progressStore.update(value => ({
+        ...value,
+        status: 'loading',
+      }));
+
       //implement a check if the product was already searched in the last 10 minutes
       const alreadySearched = await this.checkIfProductAlreadySearched();
       if (alreadySearched) {
@@ -87,6 +94,10 @@ export class StoreDataHandler {
         }));
         return;
       }
+
+      // Fetch cashback link
+      this.awinLink = await this.fetchCashbackLink();
+
 
       // Fetch dataExpertStore
       this.dataExpertStore = await expertStores().then((expertStores) => {
@@ -190,7 +201,7 @@ export class StoreDataHandler {
 
   startNewSearch() {
     progressStore.update(() => ({
-      status: 'ready',
+      status: 'loading',
       current: 0,
       total: 0,
     }));
@@ -218,11 +229,16 @@ export class StoreDataHandler {
     }
   }
 
-  public async fetchCashbackLink(): Promise<string | void> {
+  private async fetchCashbackLink(): Promise<string | undefined> {
     const awinLink = await getLinkomatAwin();
     if (awinLink) {
       return awinLink;
     }
+    return undefined
+  }
+
+  public get getAwinLink(): string | undefined {
+    return this.awinLink;
   }
 
   private async fetchProductInformation(storeId: string, storeName: string): Promise<ProductData | undefined> {
@@ -236,7 +252,7 @@ export class StoreDataHandler {
       });
 
       // Make the fetch request to the website
-      const response = await fetch('https://www.expert.de/shop/api/neo/internal-pub-service/getArticleData', {
+      const response = await fetch(GET_EXPERT_ARTICLE_URL, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -299,7 +315,7 @@ export class StoreDataHandler {
     if (aggregatedProduct.price.length === 0) return;
 
     const requestBody = JSON.stringify(aggregatedProduct);
-    const response = await fetch(productApi, {
+    const response = await fetch(DEINEXPERT_PRODUCT_URL, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

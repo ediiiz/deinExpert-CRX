@@ -1,3 +1,5 @@
+const EXPERT_STORES: string = import.meta.env.VITE_EXPERT_GET_STORES_URL as string;
+
 interface OpeningTimes {
   "Mo. - Fr."?: {
     times: [string, string],
@@ -36,5 +38,5 @@ export type ExpertStores = ExpertStore[];
 
 
 export default async function expertStores(): Promise<ExpertStores> {
-  return fetch("https://www.expert.de/shop/api/storeFinder?maxResults=1000").then((response) => response.json())
+  return fetch(EXPERT_STORES).then((response) => response.json())
 }

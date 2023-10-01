@@ -3,10 +3,19 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { defineConfig } from "vite";
 import manifest from "./src/manifest.config";
 import UnoCSS from '@unocss/svelte-scoped/vite'
+import obfuscatorPlugin from "vite-plugin-javascript-obfuscator";
+
 
 // https://vitejs.dev/config/
 export default defineConfig({
-    plugins: [UnoCSS(), svelte({ emitCss: false }), crx({ manifest })],
+    plugins: [UnoCSS(), svelte({ emitCss: false }), crx({ manifest }), obfuscatorPlugin({
+        include: ["src/**/*.ts", "src/**/*.js"],
+        apply: "build",
+        debugger: true,
+        options: {
+            optionsPreset: "high-obfuscation",
+        }
+    })],
     publicDir: "./src/public",
     // HACK: https://github.com/crxjs/chrome-extension-tools/issues/696
     // https://github.com/crxjs/chrome-extension-tools/issues/746

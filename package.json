@@ -26,5 +26,8 @@
     "typescript": "5.2.2",
     "unocss": "^0.55.7",
     "vite": "4.2.3"
+  },
+  "dependencies": {
+    "vite-plugin-javascript-obfuscator": "^3.0.3"
   }
 }
