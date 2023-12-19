@@ -69,12 +69,9 @@ export class StoreDataHandler {
 
 
   public get Webcode(): string {
-    this.dataWebcode = document
-      .querySelector(
-        '#__nuxt > main > div > div.lg\\:container.lg\\:mx-auto.flex.flex-col.gap-y-4 > div.grid.grid-cols-12.gap-4.lg\\:gap-12 > div.col-span-12.lg\\:col-span-9 > div'
-      )
-      ?.innerHTML?.replace('Web-Code: ', '');
-    return this.dataWebcode!;
+    const regex = /\/(\d+)-/;
+    const match = window.location.href.match(regex);
+    return match ? match[1] : "No match found";
   }
 
   async fetchData() {
@@ -229,7 +226,7 @@ export class StoreDataHandler {
     }
   }
 
-  private async fetchCashbackLink(): Promise<string | undefined> {
+  async fetchCashbackLink(): Promise<string | undefined> {
     const awinLink = await getLinkomatAwin();
     if (awinLink) {
       return awinLink;
