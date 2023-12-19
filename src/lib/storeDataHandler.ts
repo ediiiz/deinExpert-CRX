@@ -20,8 +20,6 @@ export const progressStore = writable({
 export class StoreDataHandler {
   products: ProductData[] = [];
   private dataExpertStore: ExpertStores | null = null;
-  private reactiveDataExpertStores: ExpertStores | null = null;
-  private dataWebcode: string | undefined = undefined;
   private dataDesktop: string | undefined = undefined;
   private dataMobile: string | undefined = undefined;
   private fetchInterval: number = 200; // 200 milliseconds (5 requests per second)
@@ -48,23 +46,28 @@ export class StoreDataHandler {
   }
 
   public async checkIfProductAlreadySearched(): Promise<boolean> {
-    const response = await fetch(`${DEINEXPERT_PRODUCT_URL}/${this.Webcode}`);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    if (data.success) {
-      const lastDate = new Date(data.product.priceHistory[0].date);
-      const now = new Date();
-      const lastDateUTC = Date.UTC(lastDate.getUTCFullYear(), lastDate.getUTCMonth(), lastDate.getUTCDate(), lastDate.getUTCHours(), lastDate.getUTCMinutes(), lastDate.getUTCSeconds());
-      const nowUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours(), now.getUTCMinutes(), now.getUTCSeconds());
-      const diff = nowUTC - lastDateUTC;
-      const diffMinutes = Math.floor(diff / 1000 / 60);
-      if (diffMinutes < 60) {
-        return true;
+    try {
+      const response = await fetch(`${DEINEXPERT_PRODUCT_URL}/${this.Webcode}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      const data = await response.json();
+
+      if (!data.success) {
+        return false;
+      }
+
+      const lastSearchDate = new Date(data.product.priceHistory[0].date);
+      const now = new Date();
+
+      // Calculate the difference in minutes between now and the last search date
+      const diffMinutes = (now.getTime() - lastSearchDate.getTime()) / (1000 * 60);
+
+      return diffMinutes < 60;
+    } catch (error) {
+      console.error('Error checking if product was already searched:', error);
+      return false;
     }
-    return false;
   }
 
 
@@ -109,11 +112,7 @@ export class StoreDataHandler {
       });
 
       // Extract values from the website's DOM
-      this.dataDesktop = document
-        .querySelector(
-          '#__nuxt > main > div > div.lg\\:container.lg\\:mx-auto.flex.flex-col.gap-y-4 > div.lg\\:grid.lg\\:grid-cols-12.lg\\:gap-12 > div.col-span-4.gap-y-4.flex.flex-col.article-pds-middle > a > div > div'
-        )
-        ?.getAttribute('data-bv-product-id')!;
+      this.dataDesktop = document.querySelectorAll('[data-bv-product-id]')[0].getAttribute("data-bv-product-id")!;
       this.dataMobile = document.querySelector('#mobileVersion > div')?.getAttribute('data-bv-product-id')!;
 
       // Continue processing the data
