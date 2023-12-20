@@ -9,6 +9,31 @@
   type modalState = 'open' | 'close';
   let state: modalState = 'close';
 
+  function setCookieFromUrlParam() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const branchId = urlParams.get('branch_id');
+
+    if (branchId) {
+      // Call the function to set the cookie
+      setCookie('fmarktcookie', branchId, 7); // Set cookie for 7 days
+    }
+  }
+
+  function setCookie(name, value, daysToLive) {
+    // Encode value in order to escape semicolons, commas, and whitespace
+    const cookieValue = encodeURIComponent(value);
+
+    // Set a far future expiry date if daysToLive is not provided
+    let expires = '';
+    if (daysToLive) {
+      const date = new Date();
+      date.setTime(date.getTime() + daysToLive * 24 * 60 * 60 * 1000);
+      expires = '; expires=' + date.toUTCString();
+    }
+
+    document.cookie = name + '=' + cookieValue + expires + '; path=/';
+  }
+
   function removeUrlParametersAndReload() {
     const url = new URL(window.location.href);
     const params = url.searchParams;
@@ -26,14 +51,18 @@
     if (isAwcPresent) params.delete('awc');
 
     // If any of the parameters were present, reload the page without them
-    if (isCampaignPresent || isCampaignIdPresent || isDtCowlPresent) {
-      url.searchParams.set('refresh', new Date().getTime().toString());
-      window.location.href = url.toString();
+    if (isCampaignPresent || isCampaignIdPresent || isDtCowlPresent || isAwcPresent) {
+      // Update the URL without reloading the page
+      window.history.replaceState({}, '', url.toString());
+
+      // Reload the page for the changes to take effect
+      window.location.reload();
     }
   }
 
   // Call the function to remove the parameters and reload
   onMount(() => {
+    setCookieFromUrlParam();
     removeUrlParametersAndReload();
   });
 </script>
