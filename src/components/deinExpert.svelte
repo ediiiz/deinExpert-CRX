@@ -5,16 +5,12 @@
   import { onDestroy } from 'svelte';
   import { Toaster, toast } from 'svelte-sonner';
 
-  let awinLink: string | void = '';
-
   const storeDataHandler = new StoreDataHandler();
 
   async function init() {
     toast.info('Orange markierte Einträge sind Aussteller!');
-    awinLink = await storeDataHandler.fetchCashbackLink();
-    if (awinLink) {
-      storeDataHandler.startNewSearch();
-    }
+    //awinLink = await storeDataHandler.fetchCashbackLink();
+    storeDataHandler.startNewSearch();
   }
 
   // create a promise based sleep function
@@ -22,8 +18,10 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  function createAffiliate(awinlink: string | void, branchId: string): string {
+  function createAffiliate(branchId: string): string {
     const url = window.location.href.split('?');
+    const awinlink = storeDataHandler.getAwinLink;
+    if (!awinlink) return url[0] + '?branch_id=e_' + branchId;
     return `${awinlink}&p=` + encodeURIComponent(`${url[0]}?branch_id=e_${branchId}`);
   }
 
@@ -35,26 +33,30 @@
     switch (status) {
       case 'error-articleId':
         toast.error('Daten konnten nicht geladen');
+        toast.info('Bitte alle Cookies akzeptieren!');
+        window.Cookiebot.renew();
         break;
-      case 'finished':
-        toast.success('Upload erfolgreich');
+      case 'uploaded':
+        toast.success('Preis hochgeladen!');
+        break;
+      case 'error-upload':
+        toast.error('Preise nicht hochgeladen!');
         break;
       case 'error-searchTooFast':
-        toast.warning('Search too fast');
+        toast.warning('Preis bereits aktuell!');
         break;
-      // Add other cases as needed
     }
   });
 </script>
 
 <Toaster richColors position={'top-right'} />
 
-<div class="flex flex-col h-100% max-h-400px place-content-start">
-  <div class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-11">
+<div class="flex flex-col h-100% max-h-400px place-content-start p-4">
+  <div class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-11 drop-shadow-2xl">
     {#if $progressStore.status === 'processing'}
       <button
         transition:fade={{ duration: 200 }}
-        class="p-4 bg-gray-400 rounded-t-2 shadow-dark shadow-2xl text-white"
+        class="p-4 bg-gray-400 rounded-t-2 shadow-2xl text-white"
         on:click={() => storeDataHandler.cancelSearch()}
       >
         Stop!
@@ -62,7 +64,7 @@
     {:else}
       <button
         transition:fade={{ duration: 200 }}
-        class="p-4 bg-gray-400 rounded-2 shadow-dark shadow-2xl text-white animate-count-infinite animate-pulse"
+        class="p-4 bg-gray-400 rounded-2 shadow-2xl text-white animate-count-infinite animate-pulse"
         on:click={async () => init()}
       >
         <div class="h-full">Suche starten!</div>
@@ -96,7 +98,7 @@
           transition:fade={{ duration: 500 }}
           class="p-4 grid justify-center items-center text-center text-white bg-gray-400 rounded-2 my-4"
         >
-          <p class="pb-4">Sobald die Suche abgeschlossen ist kannst du die Preise hier finden:</p>
+          <p class="pb-4">Sobald die Suche abgeschlossen ist, kannst du die Preise hier finden:</p>
           <a
             class="p-4 bg-gray-400 rounded-2 shadow-dark shadow-2xl text-white border-white border-2"
             href="https://dein.Expert/product/{storeDataHandler.Webcode}"
@@ -110,9 +112,9 @@
       <table>
         <thead>
           <tr>
-            <th class="sticky top-0 bg-white z-10">Preis inkl. VSK</th>
-            <th class="sticky top-0 bg-white z-10">Vsk.</th>
-            <th class="sticky top-0 bg-white z-10">Markt</th>
+            <th class="sticky top-0 bg-gray-400 z-10">Preis inkl. VSK</th>
+            <th class="sticky top-0 bg-gray-400 z-10">Vsk.</th>
+            <th class="sticky top-0 bg-gray-400 z-10">Markt</th>
           </tr>
         </thead>
         <tbody>
@@ -120,19 +122,19 @@
             {#each $productsStore as product (product.onlineStore)}
               <tr class="text-center" transition:fade={{ duration: 200 }}>
                 {#if product.itemOnDisplay === false}
-                  <td>{product.priceInclShipping || 'N/A'}€</td>
-                  <td>{product.onlineShipment[0].price.gross}€</td>
+                  <td>{product.priceInclShipping?.toFixed(2) || 'N/A'}€</td>
+                  <td>{product.onlineShipment[0].price.gross.toFixed(2)}€</td>
                   <td
                     ><button class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-                      ><a href={createAffiliate(awinLink, product.onlineStore)} target="_blank">Link</a></button
+                      ><a href={createAffiliate(product.onlineStore)} target="_blank">Link</a></button
                     ></td
                   >
                 {:else}
-                  <td class="bg-primary">{product.priceInclShipping || 'N/A'}€ inkl. Vsk.</td>
-                  <td class="bg-primary">{product.onlineShipment[0].price.gross}€</td>
+                  <td class="bg-primary">{product.priceInclShipping?.toFixed(2) || 'N/A'}€</td>
+                  <td class="bg-primary">{product.onlineShipment[0].price.gross.toFixed(2)}€</td>
                   <td class="bg-primary"
                     ><button class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-                      ><a href={createAffiliate(awinLink, product.onlineStore)} target="_blank">Link</a></button
+                      ><a href={createAffiliate(product.onlineStore)} target="_blank">Link</a></button
                     >
                   </td>
                 {/if}
@@ -154,6 +156,11 @@
     -webkit-box-shadow: inset 0 -10px 10px -10px rgba(17, 17, 17, 0.322);
     box-shadow: inset 0 -10px 20px -10px rgba(17, 17, 17, 0.322);
   }
+
+  #table-container::-webkit-scrollbar {
+    display: none;
+  }
+
   th,
   td {
     padding: 8px 12px;

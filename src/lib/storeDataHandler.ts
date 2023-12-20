@@ -8,7 +8,7 @@ const DEINEXPERT_PRODUCT_URL: string = import.meta.env.VITE_DEINEXPERT_PRODUCT_U
 
 import type { product } from './types/deinExpertApi';
 
-type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId' | 'error-searchTooFast' | 'loading'
+type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId' | 'error-searchTooFast' | 'loading' | 'uploaded' | 'error-upload';
 
 export const productsStore = writable<ProductData[]>([]);
 export const progressStore = writable({
@@ -25,7 +25,7 @@ export class StoreDataHandler {
   private fetchInterval: number = 200; // 200 milliseconds (5 requests per second)
   private abortController: AbortController | null = null;
   private isSearchCancelled: boolean = false;
-  private awinLink: string | undefined = undefined;
+  private awinLink: string | void = undefined;
   private unsubscribe: () => void;
 
   constructor() {
@@ -112,7 +112,7 @@ export class StoreDataHandler {
       });
 
       // Extract values from the website's DOM
-      this.dataDesktop = document.querySelectorAll('[data-bv-product-id]')[0].getAttribute("data-bv-product-id")!;
+      this.dataDesktop = document.querySelectorAll('[data-bv-product-id]')[0]?.getAttribute("data-bv-product-id")!;
       this.dataMobile = document.querySelector('#mobileVersion > div')?.getAttribute('data-bv-product-id')!;
 
       // Continue processing the data
@@ -143,14 +143,12 @@ export class StoreDataHandler {
   }
 
   private processData() {
-    // Perform further operations with the fetched data here
     console.log('Processing data:', this.dataExpertStore);
     progressStore.update(() => ({
       status: 'processing',
       current: 0,
       total: 0,
     }));
-    // You can use the data here or call other methods as needed
     this.processStores();
   }
 
@@ -226,14 +224,15 @@ export class StoreDataHandler {
   }
 
   async fetchCashbackLink(): Promise<string | undefined> {
-    const awinLink = await getLinkomatAwin();
-    if (awinLink) {
-      return awinLink;
+    this.awinLink = await getLinkomatAwin();
+    if (this.awinLink) {
+      return this.awinLink;
     }
+    this.cancelSearch();
     return undefined
   }
 
-  public get getAwinLink(): string | undefined {
+  public get getAwinLink(): string | void {
     return this.awinLink;
   }
 
@@ -293,46 +292,52 @@ export class StoreDataHandler {
   }
 
   public async uploadData() {
-    const aggregatedProduct: product = {
-      webcode: this.Webcode,
-      url: window.location.href.split('?')[0],
-      price: []
-    };
+    try {
+      const aggregatedProduct: product = {
+        webcode: this.Webcode,
+        url: window.location.href.split('?')[0],
+        price: []
+      };
 
-    this.products.forEach((product) => {
-      aggregatedProduct.price.push({
-        price: product.priceInclShipping!,
-        branchName: product.showStoreName!,
-        branchId: parseInt(product.onlineStore),
-        aussteller: product.itemOnDisplay,
+      this.products.forEach((product) => {
+        aggregatedProduct.price.push({
+          price: product.priceInclShipping!,
+          branchName: product.showStoreName!,
+          branchId: parseInt(product.onlineStore),
+          aussteller: product.itemOnDisplay,
+        });
       });
-    });
 
-    if (aggregatedProduct.price.length === 0) return;
+      if (aggregatedProduct.price.length === 0) return;
 
-    const requestBody = JSON.stringify(aggregatedProduct);
-    const response = await fetch(DEINEXPERT_PRODUCT_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        accept: 'application/json',
-      },
-      body: requestBody,
-    });
+      const requestBody = JSON.stringify(aggregatedProduct);
+      const response = await fetch(DEINEXPERT_PRODUCT_URL, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json',
+        },
+        body: requestBody,
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
 
-    const data = await response.json();
-    console.log(data);
+      const data = await response.json();
+      console.log(data);
 
-    await this.sleep(2000).then(() => {
       progressStore.update(value => ({
         ...value,
-        status: 'processing',
+        status: 'uploaded',
       }));
-    });
+    } catch {
+      console.error('Error uploading data');
+      progressStore.update(value => ({
+        ...value,
+        status: 'error-upload',
+      }));
+    }
   }
 
   public async sleep(ms: number) {
