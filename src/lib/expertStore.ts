@@ -1,4 +1,4 @@
-const EXPERT_STORES: string = import.meta.env.VITE_EXPERT_GET_STORES_URL as string;
+const EXPERT_STORES: string = "https://shop.brntgs.expert.de/api/storeFinder?maxResults=1000"
 
 interface OpeningTimes {
   "Mo. - Fr."?: {

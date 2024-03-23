@@ -3,8 +3,8 @@ import expertStores, { type ExpertStores } from '../lib/expertStore';
 import { writable } from 'svelte/store';
 import { getLinkomatAwin } from './cashback/linkomat';
 
-const GET_EXPERT_ARTICLE_URL: string = import.meta.env.VITE_EXPERT_GET_ARTICLE_URL as string;
-const DEINEXPERT_PRODUCT_URL: string = import.meta.env.VITE_DEINEXPERT_PRODUCT_URL as string;
+const GET_EXPERT_ARTICLE_URL: string = 'https://www.expert.de/shop/api/neo/internal-pub-service/getArticleData'
+const DEINEXPERT_PRODUCT_URL: string = 'https://dein.expert/api/product'
 
 import type { product } from './types/deinExpertApi';
 
