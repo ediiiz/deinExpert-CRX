@@ -1,85 +1,46 @@
-import expertStores, { type ExpertStores } from '../lib/expertStore';
 import { writable } from 'svelte/store';
-import { z } from 'zod';
+import { cashbackSchema, productPriceSchema, productSchema, storeSchema, type ProductDataSchema, type ProductSchema, type StoreSchema, } from './schema';
 
-
-const DEINEXPERT_HOST: string = 'http://localhost:5172'
+const DEINEXPERT_HOST: string = 'https://dein.expert'
 const GET_EXPERT_ARTICLE_URL: string = 'https://production.brntgs.expert.de/api/neo/internal-pub-service/getArticleData'
-const DEINEXPERT_API_URL: string =  `${DEINEXPERT_HOST}/api`
+const DEINEXPERT_API_URL: string = `${DEINEXPERT_HOST}/api`
 const EXPERT_STORES: string = "https://shop.brntgs.expert.de/api/storeFinder?maxResults=1000"
 
-import type { product } from './types/deinExpertApi';
+export enum ProgressStatus {
+  INITIAL = 'initial',
+  READY = 'ready',
+  RESTARTED = 'restarted',
+  FINISHED = 'finished',
+  PROCESSING = 'processing',
+  CANCELLED = 'cancelled',
+  ERROR = 'error',
+  LOADING = 'loading',
+  UPLOADED = 'uploaded',
+}
 
-type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error' | 'loading' | 'uploaded';
+export enum SubStatus {
+  NONE = 'none',
+  API_KEY_MISSING = 'api_key_missing',
+  API_KEY_INVALID = 'api_key_invalid',
+  PRODUCT_ALREADY_SEARCHED = 'product_already_searched',
+  NO_PRODUCT_ID = 'no_product_id',
+  ERROR_FETCHING_STORES = 'error_fetching_stores',
+  ERROR_UPLOADING_DATA = 'error_uploading_data',
+  SUCCESS_SEARCH_COMPLETED = 'success_search_completed',
+  SUCCESS_UPLOADED = 'success_uploaded',
+}
 
 export const productsStore = writable<ProductDataSchema[]>([]);
+
 export const progressStore = writable({
   current: 0,
   total: 0,
-  status: 'ready' as progessStatus,
+  status: ProgressStatus.INITIAL,
+  subStatus: SubStatus.NONE,
   message: '',
 });
 
-const storeSchema = z.array(
-  z.object({
-    store: z.object({
-      website: z.boolean().refine((val) => val === true, {
-        message: "Website must be true",
-      }),
-      name: z.string().min(1),
-      storeId: z.string().min(1),
-    }),
-  })
-)
 
-type StoreSchema = z.infer<typeof storeSchema>;
-
-const productSchema = z.object({
-  article: z.object({
-    slug: z.string().min(1),
-    title: z.string().min(1),
-    webcode: z.string().min(1),
-    articleId: z.string().min(1),
-  }),
-  primaryImageMedium: z.object({
-    originalData: z.string().min(1),
-  }),
-  brand: z.object({
-    name: z.string().min(1),
-  }),
-});
-
-type ProductSchema = z.infer<typeof productSchema>;
-
-const productPriceSchema = z.object({
-  price: z.object({
-    gross: z.number().nonnegative('Net price must be a non-negative number'),
-  }),
-  onlineButtonAction: z.literal('ORDER'),
-  itemOnDisplay: z.boolean(),
-  onlineShipment: z.array(z.object({
-    price: z.object({
-      gross: z.number().nonnegative('Shipment gross price must be a non-negative number'),
-    }),
-  })).optional(),
-});
-
-type ProductPriceSchema = z.infer<typeof productPriceSchema>;
-
-const singleStoreSchema = z.object({
-  store: z.object({
-    name: z.string(),
-    id: z.string(),
-  }),
-});
-
-// Merge the store schema with the productPriceSchema
-export const productDataSchema = singleStoreSchema.merge(productPriceSchema);
-
-export type ProductDataSchema = z.infer<typeof productDataSchema>;
-
-
-// REDO THE TYPE PRODUCT ADD WEBCODE
 
 export class StoreDataHandler {
   products: ProductDataSchema[] = [];
@@ -96,7 +57,7 @@ export class StoreDataHandler {
   constructor() {
     progressStore.update(value => ({
       ...value,
-      status: 'ready'
+      status: ProgressStatus.READY,
     }));
     // Assuming this class has a constructor, initialize the subscription here
     this.unsubscribe = progressStore.subscribe((value) => {
@@ -129,9 +90,7 @@ export class StoreDataHandler {
 
   async checkApiKey() {
     this.getApiKeyFromLocalStorage
-
     const test = await this.fetchCashbackLink()
-
     return test
   }
 
@@ -173,35 +132,28 @@ export class StoreDataHandler {
 
   async fetchData() {
     try {
-
       progressStore.update(value => ({
         ...value,
-        status: 'loading',
+        status: ProgressStatus.LOADING,
+        subStatus: SubStatus.NONE,
       }));
 
-
       if (!(await this.checkApiKey())) {
-        progressStore.update((value) => ({
+        progressStore.update(value => ({
           ...value,
-          status: "error",
-          message: "API Key fehlt oder falsch!",
+          status: ProgressStatus.ERROR,
+          subStatus: SubStatus.API_KEY_INVALID,
+          message: 'API Key fehlt oder falsch!',
         }));
-
-        progressStore.update((value) => ({
-          ...value,
-          status: "ready",
-          message: "",
-        }));
-        
-        this.cancelSearch();
+        return;
       }
 
-      //implement a check if the product was already searched in the last 10 minutes
       const alreadySearched = await this.checkIfProductAlreadySearched();
       if (alreadySearched) {
         progressStore.update(value => ({
           ...value,
-          status: 'error',
+          status: ProgressStatus.ERROR,
+          subStatus: SubStatus.PRODUCT_ALREADY_SEARCHED,
           message: 'Product was already searched in the last 60 minutes',
         }));
         return;
@@ -210,24 +162,23 @@ export class StoreDataHandler {
 
       // Fetch dataExpertStore
       const expertStores = await this.expertStores();
-
       if (!expertStores.success) {
-        console.error('Error fetching stores');
         progressStore.update(value => ({
           ...value,
-          status: 'error',
+          status: ProgressStatus.ERROR,
+          subStatus: SubStatus.ERROR_FETCHING_STORES,
           message: 'Error fetching stores',
         }));
         return;
       }
 
-      this.dataExpertStore = expertStores.data
+      this.dataExpertStore = expertStores.data;
 
       if (!this.Webcode) {
-        console.error('No product ID found on the website');
         progressStore.update(value => ({
           ...value,
-          status: 'error',
+          status: ProgressStatus.ERROR,
+          subStatus: SubStatus.NO_PRODUCT_ID,
           message: 'No webcode found on the website',
         }));
         return;
@@ -235,35 +186,28 @@ export class StoreDataHandler {
 
       // Extract values from the website's DOM
       const productInfo = await this.getProductInfo(this.Webcode);
-
       if (!productInfo.success) {
-        console.error('No product ID found on the website');
-        // update store to show error
         progressStore.update(value => ({
           ...value,
-          status: 'error',
+          status: ProgressStatus.ERROR,
+          subStatus: SubStatus.NO_PRODUCT_ID,
           message: 'No product ID found on the website',
         }));
-
-        await this.sleep(2000).then(() => {
-          progressStore.update(value => ({
-            ...value,
-            status: 'ready',
-          }));
-        }
-        );
-
         return;
       }
-
 
       // Continue processing the data
       this.processStores(productInfo.data);
 
 
     } catch (error) {
-      // Handle any errors that may occur during the fetch operation or DOM manipulation
       console.error('Error fetching data:', error);
+      progressStore.update(value => ({
+        ...value,
+        status: ProgressStatus.ERROR,
+        subStatus: SubStatus.NONE,
+        message: 'An error occurred while fetching data',
+      }));
     }
   }
 
@@ -285,22 +229,15 @@ export class StoreDataHandler {
   }
 
   private async processStores(productInfo: ProductSchema) {
-    console.log('Processing data:', this.dataExpertStore);
-    progressStore.update(() => ({
-      status: 'processing',
+    progressStore.update(value => ({
+      ...value,
+      status: ProgressStatus.PROCESSING,
+      subStatus: SubStatus.NONE,
       current: 0,
-      total: 0,
-      message: '',
+      total: this.dataExpertStore!.length,
     }));
 
     if (!this.dataExpertStore) return;
-
-    progressStore.update((value) => ({
-      ...value,
-      current: 0,
-      total: this.dataExpertStore!.length,
-      status: 'processing'
-    }));
 
     let wasCancelled = false;
 
@@ -329,22 +266,21 @@ export class StoreDataHandler {
 
     progressStore.update(value => ({
       ...value,
-      status: wasCancelled ? 'cancelled' : 'finished'
+      status: wasCancelled ? ProgressStatus.CANCELLED : ProgressStatus.FINISHED,
+      subStatus: wasCancelled ? SubStatus.NONE : SubStatus.SUCCESS_SEARCH_COMPLETED,
     }));
   }
 
   startNewSearch() {
     progressStore.update(() => ({
-      status: 'loading',
+      status: ProgressStatus.RESTARTED,
+      subStatus: SubStatus.NONE,
       current: 0,
       total: 0,
       message: '',
     }));
-    // Reset the products array
     this.products = [];
     productsStore.set(this.products);
-    
-    // set progesStore status to restarted
     this.isSearchCancelled = false;
     this.abortController = new AbortController();
     this.fetchData();
@@ -352,7 +288,8 @@ export class StoreDataHandler {
 
   cancelSearch() {
     progressStore.update(() => ({
-      status: 'cancelled',
+      status: ProgressStatus.CANCELLED,
+      subStatus: SubStatus.NONE,
       current: 0,
       total: 0,
       message: '',
@@ -367,20 +304,21 @@ export class StoreDataHandler {
   }
 
   async fetchCashbackLink() {
-    const cashbackSchema = z.object({
-      url: z.string().min(1),
-    });
+    try {
+      const response = await fetch(`${DEINEXPERT_API_URL}/affiliate?apikey=${this.apiKey}`);
+      if (!response.ok) {
+        return false;
+      }
 
-    const cashbackLink = cashbackSchema.safeParse(await fetch(`${DEINEXPERT_API_URL}/affiliate?apikey=${this.apiKey}`).then((response) => response.json()).catch(() => undefined));
-
-    if (!cashbackLink.success) {
-      this.cancelSearch();
+      const cashbackLink = cashbackSchema.safeParse(await response.json().catch(() => undefined));
+      if (!cashbackLink.success) {
+        return false;
+      }
+      this.awinLink = cashbackLink.data.url;
+      return true;
+    } catch (error) {
       return false;
     }
-
-    this.awinLink = cashbackLink.data.url;
-
-    return true;
   }
 
   public get getAwinLink(): string | void {
@@ -449,7 +387,7 @@ export class StoreDataHandler {
     }
   }
 
-  public async uploadData() {
+  async uploadData() {
     try {
       const products = this.products;
 
@@ -474,19 +412,21 @@ export class StoreDataHandler {
 
       progressStore.update(value => ({
         ...value,
-        status: 'uploaded',
+        status: ProgressStatus.UPLOADED,
+        subStatus: SubStatus.SUCCESS_UPLOADED,
       }));
     } catch {
       console.error('Error uploading data');
       progressStore.update(value => ({
         ...value,
-        status: 'error',
+        status: ProgressStatus.ERROR,
+        subStatus: SubStatus.ERROR_UPLOADING_DATA,
         message: 'Error uploading data',
       }));
     }
   }
 
-  public async sleep(ms: number) {
+  async sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

@@ -1,222 +1,99 @@
 <script lang="ts">
-  import { fade } from "svelte/transition";
+	import { onDestroy } from 'svelte';
+	import {
+		ProgressStatus,
+		StoreDataHandler,
+		SubStatus,
+		productsStore,
+		progressStore
+	} from '../lib/storeDataHandler';
+	import { Toaster, toast } from 'svelte-sonner';
+	import ControlButton from './ControlButton.svelte';
+	import ProgressBar from './ProgressBar.svelte';
+	import MessageDisplay from './MessageDisplay.svelte';
+	import ProductTable from './ProductTable.svelte';
+	import type { ProductDataSchema } from '../lib/schema';
+	import ErrorDisplay from './ErrorDisplay.svelte';
 
-  import {
-    StoreDataHandler,
-    productsStore,
-    progressStore,
-  } from "../lib/storeDataHandler";
-  import { onDestroy } from "svelte";
-  import { Toaster, toast } from "svelte-sonner";
-  import type { ProductDataSchema } from "../lib/storeDataHandler";
-    import ApiKey from "./ApiKey.svelte";
+	const storeDataHandler = new StoreDataHandler();
 
-  const storeDataHandler = new StoreDataHandler();
+	async function init() {
+		storeDataHandler.startNewSearch();
+	}
 
-  async function init() {
-    toast.info("Orange markierte Einträge sind Aussteller!");
-    //awinLink = await storeDataHandler.fetchCashbackLink();
-    storeDataHandler.startNewSearch();
-  }
+	onDestroy(() => {
+		storeDataHandler.ngOnDestroy();
+	});
 
-  // create a promise based sleep function
-  function sleep(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
+	progressStore.subscribe(({ status, subStatus }) => {
+		if (status === ProgressStatus.ERROR) {
+			switch (subStatus) {
+				case SubStatus.API_KEY_MISSING:
+					toast.error('API Key fehlt!');
+					break;
+				case SubStatus.API_KEY_INVALID:
+					toast.error('API Key ist ungültig!');
+					break;
+				case SubStatus.PRODUCT_ALREADY_SEARCHED:
+					toast.error('Produkt wurde bereits in den letzten 60 Minuten gesucht!');
+					break;
+				case SubStatus.NO_PRODUCT_ID:
+					toast.error('Keine Produkt-ID gefunden!');
+					break;
+				case SubStatus.ERROR_FETCHING_STORES:
+					toast.error('Fehler beim Abrufen der Geschäfte!');
+					break;
+				case SubStatus.ERROR_UPLOADING_DATA:
+					toast.error('Fehler beim Hochladen der Daten!');
+					break;
+				default:
+					toast.error('Ein unbekannter Fehler ist aufgetreten!');
+					break;
+			}
+		} else if (status === ProgressStatus.UPLOADED) {
+			toast.success('Preis hochgeladen!');
+		}
+	});
 
-  function createAffiliate(
-    awinlink: string | void,
-    selectedMarket: string,
-  ): string {
-    if (!awinlink)
-      return `https://www.expert.de/shop/suche?q=${storeDataHandler.Webcode}&branch_id=e_${selectedMarket}`;
-    return `${awinlink}&ued=${encodeURIComponent(`https://www.expert.de/shop/suche?q=${storeDataHandler.Webcode}&branch_id=e_${selectedMarket}`)}`;
-  }
+	function createAffiliate(awinlink: string | void, selectedMarket: string): string {
+		if (!awinlink) {
+			return `https://www.expert.de/shop/suche?q=${storeDataHandler.Webcode}&branch_id=e_${selectedMarket}`;
+		}
+		return `${awinlink}&ued=${encodeURIComponent(`https://www.expert.de/shop/suche?q=${storeDataHandler.Webcode}&branch_id=e_${selectedMarket}`)}`;
+	}
 
-  function calculatePriceInclShipping(productData: ProductDataSchema) {
-    return (
-      productData.price.gross +
-      (productData.onlineShipment
-        ? productData.onlineShipment[0].price.gross
-        : 0)
-    );
-  }
-
-  onDestroy(() => {
-    storeDataHandler.ngOnDestroy();
-  });
-
-  progressStore.subscribe(({ status }) => {
-    switch (status) {
-      case "error":
-        toast.error($progressStore.message);
-        window.Cookiebot.renew();
-        break;
-      case "uploaded":
-        toast.success("Preis hochgeladen!");
-        break;
-    }
-  });
-
-  let apiKey = "";
-
-  function handleSubmit(event: Event) {
-    event.preventDefault();
-    console.log("API Key:", apiKey);
-    storeDataHandler.setApiKeyToLocalStorage(apiKey);
-    progressStore.update((value) => ({...value, status: "ready" }));
-  }
+	function calculatePriceInclShipping(productData: ProductDataSchema) {
+		return (
+			productData.price.gross +
+			(productData.onlineShipment ? productData.onlineShipment[0].price.gross : 0)
+		);
+	}
 </script>
 
-<Toaster richColors position={"top-right"} />
+<Toaster richColors position="top-right" />
 
-<div class="flex flex-col h-100% max-h-400px place-content-start p-4 gap-4">
-  <div
-    class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-11 drop-shadow-2xl"
-  >
-    {#if $progressStore.status === "processing"}
-      <button
-        transition:fade={{ duration: 200 }}
-        class="p-4 bg-gray-400 rounded-t-2 shadow-2xl text-white"
-        on:click={() => storeDataHandler.cancelSearch()}
-      >
-        Stop!
-      </button>
-    {:else}
-      <button
-        transition:fade={{ duration: 200 }}
-        class="p-4 bg-gray-400 rounded-2 shadow-2xl text-white animate-count-infinite animate-pulse"
-        on:click={async () => init()}
-      >
-        <div class="h-full">Suche starten!</div>
-      </button>
-    {/if}
-  </div>
-  {#if $progressStore.status === "processing" && $progressStore.total !== 0}
-    <div class="relative -top-0.5 z-11">
-      <div class="h-1 w-full bg-neutral-200 dark:bg-neutral-600">
-        <div
-          class="h-1 bg-primary"
-          style="width: {($progressStore.current / $progressStore.total) *
-            100}%"
-        />
-      </div>
-    </div>
-  {/if}
-
-  {#if $progressStore.status === "ready" || $progressStore.status === "error"}
-    <div class="grid justify-center items-center text-center">
-      {#if $progressStore.message === "Product was already searched in the last 60 minutes"}
-        <div
-          transition:fade={{ duration: 500 }}
-          class="p-4 grid justify-center items-center text-center bg-red rounded-2 my-4"
-        >
-          <p class="">
-            In den letzten {storeDataHandler.waitTime} Minuten wurde dieser Artikel
-            bereits von jemanden gesucht.
-          </p>
-          <a
-            class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-            href="https://dein.Expert/product/{storeDataHandler.Webcode}"
-            target="_blank">Link zum Suchergebniss</a
-          >
-        </div>
-      {:else if $progressStore.message === "API Key fehlt oder falsch!"}
-        <ApiKey {apiKey} {handleSubmit} />
-      {:else}
-        <div
-          transition:fade={{ duration: 500 }}
-          class="p-4 grid justify-center items-center text-center text-white bg-gray-400 rounded-2 my-4"
-        >
-          <p class="pb-4">
-            Sobald die Suche abgeschlossen ist, kannst du die Preise hier
-            finden:
-          </p>
-          <a
-            class="p-4 bg-gray-400 rounded-2 shadow-dark shadow-2xl text-white border-white border-2"
-            href="https://dein.Expert/product/{storeDataHandler.Webcode}"
-            target="_blank">Link zum Produkt</a
-          >
-        </div>
-      {/if}
-    </div>
-  {:else}
-    <div
-      id="table-container"
-      class="h-80% overflow-auto grid grid-cols-1 shadow-inset rounded-b-2"
-    >
-      <table>
-        <thead>
-          <tr>
-            <th class="sticky top-0 bg-gray-400 z-10">Preis inkl. VSK</th>
-            <th class="sticky top-0 bg-gray-400 z-10">Markt</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#if $progressStore.status !== "restarted"}
-            {#each $productsStore as product (product.store.id)}
-              <tr class="text-center" transition:fade={{ duration: 200 }}>
-                {#if product.itemOnDisplay === false}
-                  <td>{calculatePriceInclShipping(product) || "N/A"}€</td>
-                  <td
-                    ><button
-                      class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-                      ><a
-                        href={createAffiliate(
-                          storeDataHandler.getAwinLink,
-                          product.store.id,
-                        )}
-                        target="_blank">Link</a
-                      ></button
-                    ></td
-                  >
-                {:else}
-                  <td class="bg-primary"
-                    >{calculatePriceInclShipping(product) || "N/A"}€</td
-                  >
-                  <td class="bg-primary"
-                    ><button
-                      class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-                      ><a
-                        href={createAffiliate(
-                          storeDataHandler.getAwinLink,
-                          product.store.id,
-                        )}
-                        target="_blank">Link</a
-                      ></button
-                    >
-                  </td>
-                {/if}
-              </tr>
-            {/each}
-          {/if}
-        </tbody>
-      </table>
-    </div>
-  {/if}
+<div>
+	<div class="relative top-1 z-100 px-2">
+		{#if $progressStore.status === ProgressStatus.PROCESSING}
+			<ProgressBar />
+		{:else}
+			<div class="h-1"></div>
+		{/if}
+	</div>
+	<div class="flex flex-col h-full max-h-400px p-2 gap-2 tw-container">
+		<ControlButton {init} {storeDataHandler} />
+		{#if $progressStore.status === ProgressStatus.READY}
+			<MessageDisplay {storeDataHandler} />
+		{:else if $progressStore.status === ProgressStatus.ERROR}
+			<ErrorDisplay {storeDataHandler} />
+		{:else if $progressStore.status === ProgressStatus.PROCESSING || $progressStore.status === ProgressStatus.UPLOADED || $progressStore.status === ProgressStatus.CANCELLED}
+			<ProductTable {storeDataHandler} {createAffiliate} {calculatePriceInclShipping} />
+		{/if}
+	</div>
 </div>
 
 <style>
-  .tw-container > * {
-    grid-area: 1 / 1;
-  }
-  #table-container {
-    -moz-box-shadow: inset 0 -10px 10px -10px rgba(17, 17, 17, 0.322);
-    -webkit-box-shadow: inset 0 -10px 10px -10px rgba(17, 17, 17, 0.322);
-    box-shadow: inset 0 -10px 20px -10px rgba(17, 17, 17, 0.322);
-  }
-
-  #table-container::-webkit-scrollbar {
-    display: none;
-  }
-
-  th,
-  td {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-  }
-
-  th {
-    background-color: #f2f2f2;
-  }
+	.tw-container > * {
+		grid-area: 1 / 1;
+	}
 </style>
