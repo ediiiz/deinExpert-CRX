@@ -3,6 +3,8 @@
   import DeinExpert from './deinExpert.svelte';
   import { onMount } from 'svelte';
 
+  console.log(window.location.pathname);
+
   function switchModal() {
     state == 'open' ? (state = 'close') : (state = 'open');
   }
@@ -67,7 +69,7 @@
   });
 </script>
 
-{#if window.location.pathname.startsWith('/shop') && state == 'close'}
+{#if window.location.pathname.startsWith('/shop/unsere-produkte') && state == 'close'}
   <div transition:fade class="fixed bottom-4 left-0 z-9999 text-white w-screen">
     <div class="flex place-content-center">
       <button
@@ -95,8 +97,3 @@
   </div>
 {/if}
 
-<style>
-  #Overlay {
-    font-family: 'Courier New', Courier, monospace;
-  }
-</style>

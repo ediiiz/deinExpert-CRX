@@ -1,31 +1,96 @@
-import type { ProductData } from '../lib/types/getArticleData';
 import expertStores, { type ExpertStores } from '../lib/expertStore';
 import { writable } from 'svelte/store';
-import { getLinkomatAwin } from './cashback/linkomat';
+import { z } from 'zod';
 
-const GET_EXPERT_ARTICLE_URL: string = 'https://www.expert.de/shop/api/neo/internal-pub-service/getArticleData'
-const DEINEXPERT_PRODUCT_URL: string = 'https://dein.expert/api/product'
+
+const DEINEXPERT_HOST: string = 'http://localhost:5172'
+const GET_EXPERT_ARTICLE_URL: string = 'https://production.brntgs.expert.de/api/neo/internal-pub-service/getArticleData'
+const DEINEXPERT_API_URL: string =  `${DEINEXPERT_HOST}/api`
+const EXPERT_STORES: string = "https://shop.brntgs.expert.de/api/storeFinder?maxResults=1000"
 
 import type { product } from './types/deinExpertApi';
 
-type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error-articleId' | 'error-searchTooFast' | 'loading' | 'uploaded' | 'error-upload';
+type progessStatus = 'ready' | 'restarted' | 'finished' | 'processing' | 'cancelled' | 'error' | 'loading' | 'uploaded';
 
-export const productsStore = writable<ProductData[]>([]);
+export const productsStore = writable<ProductDataSchema[]>([]);
 export const progressStore = writable({
   current: 0,
   total: 0,
   status: 'ready' as progessStatus,
+  message: '',
 });
 
+const storeSchema = z.array(
+  z.object({
+    store: z.object({
+      website: z.boolean().refine((val) => val === true, {
+        message: "Website must be true",
+      }),
+      name: z.string().min(1),
+      storeId: z.string().min(1),
+    }),
+  })
+)
+
+type StoreSchema = z.infer<typeof storeSchema>;
+
+const productSchema = z.object({
+  article: z.object({
+    slug: z.string().min(1),
+    title: z.string().min(1),
+    webcode: z.string().min(1),
+    articleId: z.string().min(1),
+  }),
+  primaryImageMedium: z.object({
+    originalData: z.string().min(1),
+  }),
+  brand: z.object({
+    name: z.string().min(1),
+  }),
+});
+
+type ProductSchema = z.infer<typeof productSchema>;
+
+const productPriceSchema = z.object({
+  price: z.object({
+    gross: z.number().nonnegative('Net price must be a non-negative number'),
+  }),
+  onlineButtonAction: z.literal('ORDER'),
+  itemOnDisplay: z.boolean(),
+  onlineShipment: z.array(z.object({
+    price: z.object({
+      gross: z.number().nonnegative('Shipment gross price must be a non-negative number'),
+    }),
+  })).optional(),
+});
+
+type ProductPriceSchema = z.infer<typeof productPriceSchema>;
+
+const singleStoreSchema = z.object({
+  store: z.object({
+    name: z.string(),
+    id: z.string(),
+  }),
+});
+
+// Merge the store schema with the productPriceSchema
+export const productDataSchema = singleStoreSchema.merge(productPriceSchema);
+
+export type ProductDataSchema = z.infer<typeof productDataSchema>;
+
+
+// REDO THE TYPE PRODUCT ADD WEBCODE
+
 export class StoreDataHandler {
-  products: ProductData[] = [];
-  private dataExpertStore: ExpertStores | null = null;
-  private dataDesktop: string | undefined = undefined;
-  private dataMobile: string | undefined = undefined;
+  products: ProductDataSchema[] = [];
+  private apiKey: string | undefined = undefined;
+  private dataExpertStore: StoreSchema | null = null;
   private fetchInterval: number = 200; // 200 milliseconds (5 requests per second)
   private abortController: AbortController | null = null;
   private isSearchCancelled: boolean = false;
   private awinLink: string | void = undefined;
+  private waitMinutes: number = 60;
+  private productInfo: ProductSchema | undefined = undefined;
   private unsubscribe: () => void;
 
   constructor() {
@@ -45,9 +110,34 @@ export class StoreDataHandler {
     this.unsubscribe();
   }
 
+  async expertStores() {
+    const data = storeSchema.safeParse(await fetch(EXPERT_STORES).then((response) => response.json()).catch(() => undefined))
+    return data
+  }
+
+  get getApiKeyFromLocalStorage() {
+    const apiKey = localStorage.getItem('apiKey');
+    if (apiKey) {
+      this.apiKey = apiKey;
+    }
+    return this.apiKey;
+  }
+
+  setApiKeyToLocalStorage(apiKey: string) {
+    localStorage.setItem('apiKey', apiKey);
+  }
+
+  async checkApiKey() {
+    this.getApiKeyFromLocalStorage
+
+    const test = await this.fetchCashbackLink()
+
+    return test
+  }
+
   public async checkIfProductAlreadySearched(): Promise<boolean> {
     try {
-      const response = await fetch(`${DEINEXPERT_PRODUCT_URL}/${this.Webcode}`);
+      const response = await fetch(`${DEINEXPERT_API_URL}/product/${this.Webcode}?apikey=${this.apiKey}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -63,18 +153,22 @@ export class StoreDataHandler {
       // Calculate the difference in minutes between now and the last search date
       const diffMinutes = (now.getTime() - lastSearchDate.getTime()) / (1000 * 60);
 
-      return diffMinutes < 60;
+      return diffMinutes < this.waitMinutes;
     } catch (error) {
       console.error('Error checking if product was already searched:', error);
       return false;
     }
   }
 
+  get waitTime(): number {
+    return this.waitMinutes;
+  }
 
-  public get Webcode(): string {
+
+  public get Webcode(): string | void {
     const regex = /\/(\d+)-/;
     const match = window.location.href.match(regex);
-    return match ? match[1] : "No match found";
+    return match ? match[1] : undefined;
   }
 
   async fetchData() {
@@ -85,45 +179,70 @@ export class StoreDataHandler {
         status: 'loading',
       }));
 
+
+      if (!(await this.checkApiKey())) {
+        progressStore.update((value) => ({
+          ...value,
+          status: "error",
+          message: "API Key fehlt oder falsch!",
+        }));
+
+        progressStore.update((value) => ({
+          ...value,
+          status: "ready",
+          message: "",
+        }));
+        
+        this.cancelSearch();
+      }
+
       //implement a check if the product was already searched in the last 10 minutes
       const alreadySearched = await this.checkIfProductAlreadySearched();
       if (alreadySearched) {
         progressStore.update(value => ({
           ...value,
-          status: 'error-searchTooFast',
+          status: 'error',
+          message: 'Product was already searched in the last 60 minutes',
         }));
         return;
       }
 
-      // Fetch cashback link
-      this.awinLink = await this.fetchCashbackLink();
-
 
       // Fetch dataExpertStore
-      this.dataExpertStore = await expertStores().then((expertStores) => {
-        const seenStoreIds = new Set<string>();
-        return expertStores.filter((shop) => {
-          if (shop.store.website && !seenStoreIds.has(shop.store.storeId)) {
-            seenStoreIds.add(shop.store.storeId);
-            return true;
-          }
-          return false;
-        });
-      });
+      const expertStores = await this.expertStores();
+
+      if (!expertStores.success) {
+        console.error('Error fetching stores');
+        progressStore.update(value => ({
+          ...value,
+          status: 'error',
+          message: 'Error fetching stores',
+        }));
+        return;
+      }
+
+      this.dataExpertStore = expertStores.data
+
+      if (!this.Webcode) {
+        console.error('No product ID found on the website');
+        progressStore.update(value => ({
+          ...value,
+          status: 'error',
+          message: 'No webcode found on the website',
+        }));
+        return;
+      }
 
       // Extract values from the website's DOM
-      this.dataDesktop = document.querySelectorAll('[data-bv-product-id]')[0]?.getAttribute("data-bv-product-id")!;
-      this.dataMobile = document.querySelector('#mobileVersion > div')?.getAttribute('data-bv-product-id')!;
+      const productInfo = await this.getProductInfo(this.Webcode);
 
-      // Continue processing the data
-      if ((this.dataDesktop || this.dataMobile) && !alreadySearched) {
-        this.processData();
-      } else {
+      if (!productInfo.success) {
         console.error('No product ID found on the website');
         // update store to show error
         progressStore.update(value => ({
           ...value,
-          status: 'error-articleId',
+          status: 'error',
+          message: 'No product ID found on the website',
         }));
 
         await this.sleep(2000).then(() => {
@@ -133,7 +252,13 @@ export class StoreDataHandler {
           }));
         }
         );
+
+        return;
       }
+
+
+      // Continue processing the data
+      this.processStores(productInfo.data);
 
 
     } catch (error) {
@@ -142,17 +267,32 @@ export class StoreDataHandler {
     }
   }
 
-  private processData() {
+  private getProductInfoUrl(webcode: string) {
+    return `https://shop.brntgs.expert.de/api/search/article/webcode/${webcode}`
+  }
+
+  private async getProductInfo(webcode: string) {
+
+    const productInfo = productSchema.safeParse(await fetch(this.getProductInfoUrl(webcode))
+      .then((response) => response.json()));
+
+    this.productInfo = productInfo.data;
+    return productInfo;
+  }
+
+  get getweb() {
+    return this.productInfo;
+  }
+
+  private async processStores(productInfo: ProductSchema) {
     console.log('Processing data:', this.dataExpertStore);
     progressStore.update(() => ({
       status: 'processing',
       current: 0,
       total: 0,
+      message: '',
     }));
-    this.processStores();
-  }
 
-  private async processStores() {
     if (!this.dataExpertStore) return;
 
     progressStore.update((value) => ({
@@ -164,13 +304,11 @@ export class StoreDataHandler {
 
     let wasCancelled = false;
 
-    for (let index = 0; index < this.dataExpertStore.length; index++) {
+    for (const store of this.dataExpertStore) {
       if (this.isSearchCancelled) {
         wasCancelled = true;
         break;
       }
-      const shop = this.dataExpertStore[index];
-      const storeId = shop.store.storeId;
 
       // Use a Promise to introduce the delay
       await new Promise((resolve) => setTimeout(resolve, this.fetchInterval));
@@ -180,13 +318,15 @@ export class StoreDataHandler {
         break;
       }
 
-      this.fetchProductInformation(storeId, shop.store.name);
+      this.fetchProductInformation(productInfo, store.store.storeId, store.store.name);
 
       progressStore.update((value) => ({
         ...value,
         current: value.current + 1,
       }));
+
     }
+
     progressStore.update(value => ({
       ...value,
       status: wasCancelled ? 'cancelled' : 'finished'
@@ -198,10 +338,12 @@ export class StoreDataHandler {
       status: 'loading',
       current: 0,
       total: 0,
+      message: '',
     }));
     // Reset the products array
     this.products = [];
     productsStore.set(this.products);
+    
     // set progesStore status to restarted
     this.isSearchCancelled = false;
     this.abortController = new AbortController();
@@ -213,6 +355,7 @@ export class StoreDataHandler {
       status: 'cancelled',
       current: 0,
       total: 0,
+      message: '',
     }));
 
     this.isSearchCancelled = true;
@@ -223,25 +366,33 @@ export class StoreDataHandler {
     }
   }
 
-  async fetchCashbackLink(): Promise<string | undefined> {
-    this.awinLink = await getLinkomatAwin();
-    if (this.awinLink) {
-      return this.awinLink;
+  async fetchCashbackLink() {
+    const cashbackSchema = z.object({
+      url: z.string().min(1),
+    });
+
+    const cashbackLink = cashbackSchema.safeParse(await fetch(`${DEINEXPERT_API_URL}/affiliate?apikey=${this.apiKey}`).then((response) => response.json()).catch(() => undefined));
+
+    if (!cashbackLink.success) {
+      this.cancelSearch();
+      return false;
     }
-    this.cancelSearch();
-    return undefined
+
+    this.awinLink = cashbackLink.data.url;
+
+    return true;
   }
 
   public get getAwinLink(): string | void {
     return this.awinLink;
   }
 
-  private async fetchProductInformation(storeId: string, storeName: string): Promise<ProductData | undefined> {
+  private async fetchProductInformation(productInfo: ProductSchema, storeId: string, storeName: string): Promise<ProductDataSchema | undefined> {
     this.abortController = new AbortController();
     try {
       // Construct the body for the fetch request
       const requestBody = JSON.stringify({
-        articleId: this.dataDesktop || this.dataMobile,
+        articleId: productInfo.article.articleId,
         store: storeId,
         cacheLevel: 'MOST_RECENT',
       });
@@ -261,24 +412,31 @@ export class StoreDataHandler {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       // Parse the response as ProductData type
-      const productData: ProductData = await response.json();
+      const productPriceData = productPriceSchema.safeParse(await response.json().catch(() => undefined));
       // Push to the products array and sort by price
-      if (!productData.price?.gross || productData.onlineButtonAction !== 'ORDER') {
-        return productData;
-      }
+      if (!productPriceData.success) return;
       // replace the returned storeid with the passed storeid
 
-      productData.showStoreName = storeName;
-      productData.onlineStore = storeId;
-      productData.priceInclShipping = productData.price.gross + productData.onlineShipment[0]?.price?.gross;
-      if (!productData.priceInclShipping) return productData;
+      const productData: ProductDataSchema = {
+        store: {
+          name: storeName,
+          id: storeId,
+        },
+        ...productPriceData.data,
+      }
 
       this.products.push(productData);
+
+      function calculatePriceInclShipping(productData: ProductDataSchema) {
+        return productData.price.gross + (productData.onlineShipment ? productData.onlineShipment[0].price.gross : 0);
+      };
+
       this.products.sort((a, b) => {
-        if (a.priceInclShipping && b.priceInclShipping) {
-          return a.priceInclShipping - b.priceInclShipping;
-        }
-        return 0;
+        // Calculate and assign priceInclShipping for each product
+        const priceA = calculatePriceInclShipping(a);
+        const priceB = calculatePriceInclShipping(b);
+        // Return the comparison of the calculated prices
+        return priceA - priceB;
       });
 
       productsStore.set(this.products);
@@ -293,25 +451,12 @@ export class StoreDataHandler {
 
   public async uploadData() {
     try {
-      const aggregatedProduct: product = {
-        webcode: this.Webcode,
-        url: window.location.href.split('?')[0],
-        price: []
-      };
+      const products = this.products;
 
-      this.products.forEach((product) => {
-        aggregatedProduct.price.push({
-          price: product.priceInclShipping!,
-          branchName: product.showStoreName!,
-          branchId: parseInt(product.onlineStore),
-          aussteller: product.itemOnDisplay,
-        });
-      });
+      if (products.length === 0) return;
 
-      if (aggregatedProduct.price.length === 0) return;
-
-      const requestBody = JSON.stringify(aggregatedProduct);
-      const response = await fetch(DEINEXPERT_PRODUCT_URL, {
+      const requestBody = JSON.stringify(products);
+      const response = await fetch(`${DEINEXPERT_API_URL}/product/${this.Webcode}?apikey=${this.apiKey}`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -335,7 +480,8 @@ export class StoreDataHandler {
       console.error('Error uploading data');
       progressStore.update(value => ({
         ...value,
-        status: 'error-upload',
+        status: 'error',
+        message: 'Error uploading data',
       }));
     }
   }

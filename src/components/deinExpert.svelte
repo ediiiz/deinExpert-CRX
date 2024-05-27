@@ -1,14 +1,20 @@
 <script lang="ts">
-  import { fade } from 'svelte/transition';
+  import { fade } from "svelte/transition";
 
-  import { StoreDataHandler, productsStore, progressStore } from '../lib/storeDataHandler';
-  import { onDestroy } from 'svelte';
-  import { Toaster, toast } from 'svelte-sonner';
+  import {
+    StoreDataHandler,
+    productsStore,
+    progressStore,
+  } from "../lib/storeDataHandler";
+  import { onDestroy } from "svelte";
+  import { Toaster, toast } from "svelte-sonner";
+  import type { ProductDataSchema } from "../lib/storeDataHandler";
+    import ApiKey from "./ApiKey.svelte";
 
   const storeDataHandler = new StoreDataHandler();
 
   async function init() {
-    toast.info('Orange markierte Einträge sind Aussteller!');
+    toast.info("Orange markierte Einträge sind Aussteller!");
     //awinLink = await storeDataHandler.fetchCashbackLink();
     storeDataHandler.startNewSearch();
   }
@@ -18,11 +24,22 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  function createAffiliate(branchId: string): string {
-    const url = window.location.href.split('?');
-    const awinlink = storeDataHandler.getAwinLink;
-    if (!awinlink) return url[0] + '?branch_id=e_' + branchId;
-    return `${awinlink}&p=` + encodeURIComponent(`${url[0]}?branch_id=e_${branchId}`);
+  function createAffiliate(
+    awinlink: string | void,
+    selectedMarket: string,
+  ): string {
+    if (!awinlink)
+      return `https://www.expert.de/shop/suche?q=${storeDataHandler.Webcode}&branch_id=e_${selectedMarket}`;
+    return `${awinlink}&ued=${encodeURIComponent(`https://www.expert.de/shop/suche?q=${storeDataHandler.Webcode}&branch_id=e_${selectedMarket}`)}`;
+  }
+
+  function calculatePriceInclShipping(productData: ProductDataSchema) {
+    return (
+      productData.price.gross +
+      (productData.onlineShipment
+        ? productData.onlineShipment[0].price.gross
+        : 0)
+    );
   }
 
   onDestroy(() => {
@@ -31,29 +48,33 @@
 
   progressStore.subscribe(({ status }) => {
     switch (status) {
-      case 'error-articleId':
-        toast.error('Daten konnten nicht geladen');
-        toast.info('Bitte alle Cookies akzeptieren!');
+      case "error":
+        toast.error($progressStore.message);
         window.Cookiebot.renew();
         break;
-      case 'uploaded':
-        toast.success('Preis hochgeladen!');
-        break;
-      case 'error-upload':
-        toast.error('Preise nicht hochgeladen!');
-        break;
-      case 'error-searchTooFast':
-        toast.warning('Preis bereits aktuell!');
+      case "uploaded":
+        toast.success("Preis hochgeladen!");
         break;
     }
   });
+
+  let apiKey = "";
+
+  function handleSubmit(event: Event) {
+    event.preventDefault();
+    console.log("API Key:", apiKey);
+    storeDataHandler.setApiKeyToLocalStorage(apiKey);
+    progressStore.update((value) => ({...value, status: "ready" }));
+  }
 </script>
 
-<Toaster richColors position={'top-right'} />
+<Toaster richColors position={"top-right"} />
 
-<div class="flex flex-col h-100% max-h-400px place-content-start p-4">
-  <div class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-11 drop-shadow-2xl">
-    {#if $progressStore.status === 'processing'}
+<div class="flex flex-col h-100% max-h-400px place-content-start p-4 gap-4">
+  <div
+    class="grid gap-2 place-content-stretch tw-container relative top-0.5 z-11 drop-shadow-2xl"
+  >
+    {#if $progressStore.status === "processing"}
       <button
         transition:fade={{ duration: 200 }}
         class="p-4 bg-gray-400 rounded-t-2 shadow-2xl text-white"
@@ -71,34 +92,46 @@
       </button>
     {/if}
   </div>
-  {#if $progressStore.status === 'processing' && $progressStore.total !== 0}
+  {#if $progressStore.status === "processing" && $progressStore.total !== 0}
     <div class="relative -top-0.5 z-11">
       <div class="h-1 w-full bg-neutral-200 dark:bg-neutral-600">
-        <div class="h-1 bg-primary" style="width: {($progressStore.current / $progressStore.total) * 100}%" />
+        <div
+          class="h-1 bg-primary"
+          style="width: {($progressStore.current / $progressStore.total) *
+            100}%"
+        />
       </div>
     </div>
   {/if}
 
-  {#if $progressStore.status === 'ready' || $progressStore.status === 'error-articleId' || $progressStore.status === 'error-searchTooFast'}
+  {#if $progressStore.status === "ready" || $progressStore.status === "error"}
     <div class="grid justify-center items-center text-center">
-      {#if $progressStore.status === 'error-searchTooFast'}
+      {#if $progressStore.message === "Product was already searched in the last 60 minutes"}
         <div
           transition:fade={{ duration: 500 }}
           class="p-4 grid justify-center items-center text-center bg-red rounded-2 my-4"
         >
-          <p class="pb-4">In den letzten 10 Minuten wurde dieser Artikel bereits von jemanden gesucht.</p>
+          <p class="">
+            In den letzten {storeDataHandler.waitTime} Minuten wurde dieser Artikel
+            bereits von jemanden gesucht.
+          </p>
           <a
             class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
             href="https://dein.Expert/product/{storeDataHandler.Webcode}"
             target="_blank">Link zum Suchergebniss</a
           >
         </div>
+      {:else if $progressStore.message === "API Key fehlt oder falsch!"}
+        <ApiKey {apiKey} {handleSubmit} />
       {:else}
         <div
           transition:fade={{ duration: 500 }}
           class="p-4 grid justify-center items-center text-center text-white bg-gray-400 rounded-2 my-4"
         >
-          <p class="pb-4">Sobald die Suche abgeschlossen ist, kannst du die Preise hier finden:</p>
+          <p class="pb-4">
+            Sobald die Suche abgeschlossen ist, kannst du die Preise hier
+            finden:
+          </p>
           <a
             class="p-4 bg-gray-400 rounded-2 shadow-dark shadow-2xl text-white border-white border-2"
             href="https://dein.Expert/product/{storeDataHandler.Webcode}"
@@ -108,33 +141,49 @@
       {/if}
     </div>
   {:else}
-    <div id="table-container" class="h-80% overflow-auto grid grid-cols-1 shadow-inset rounded-b-2">
+    <div
+      id="table-container"
+      class="h-80% overflow-auto grid grid-cols-1 shadow-inset rounded-b-2"
+    >
       <table>
         <thead>
           <tr>
             <th class="sticky top-0 bg-gray-400 z-10">Preis inkl. VSK</th>
-            <th class="sticky top-0 bg-gray-400 z-10">Vsk.</th>
             <th class="sticky top-0 bg-gray-400 z-10">Markt</th>
           </tr>
         </thead>
         <tbody>
-          {#if $progressStore.status !== 'restarted'}
-            {#each $productsStore as product (product.onlineStore)}
+          {#if $progressStore.status !== "restarted"}
+            {#each $productsStore as product (product.store.id)}
               <tr class="text-center" transition:fade={{ duration: 200 }}>
                 {#if product.itemOnDisplay === false}
-                  <td>{product.priceInclShipping?.toFixed(2) || 'N/A'}€</td>
-                  <td>{product.onlineShipment[0].price.gross.toFixed(2)}€</td>
+                  <td>{calculatePriceInclShipping(product) || "N/A"}€</td>
                   <td
-                    ><button class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-                      ><a href={createAffiliate(product.onlineStore)} target="_blank">Link</a></button
+                    ><button
+                      class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
+                      ><a
+                        href={createAffiliate(
+                          storeDataHandler.getAwinLink,
+                          product.store.id,
+                        )}
+                        target="_blank">Link</a
+                      ></button
                     ></td
                   >
                 {:else}
-                  <td class="bg-primary">{product.priceInclShipping?.toFixed(2) || 'N/A'}€</td>
-                  <td class="bg-primary">{product.onlineShipment[0].price.gross.toFixed(2)}€</td>
                   <td class="bg-primary"
-                    ><button class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
-                      ><a href={createAffiliate(product.onlineStore)} target="_blank">Link</a></button
+                    >{calculatePriceInclShipping(product) || "N/A"}€</td
+                  >
+                  <td class="bg-primary"
+                    ><button
+                      class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
+                      ><a
+                        href={createAffiliate(
+                          storeDataHandler.getAwinLink,
+                          product.store.id,
+                        )}
+                        target="_blank">Link</a
+                      ></button
                     >
                   </td>
                 {/if}
