@@ -15,7 +15,7 @@ export default defineConfig( ({ mode }) => {
     plugins: [UnoCSS(), svelte({ emitCss: false }), crx({ manifest }), obfuscatorPlugin({
         include: ["src/**/*.ts", "src/**/*.js, src/**/*.svelte"],
         apply: "build",
-        debugger: false,
+        debugger: true,
         options: {
             optionsPreset: "high-obfuscation",
         }

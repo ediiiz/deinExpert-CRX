@@ -23,7 +23,7 @@
 		class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
 		href="https://dein.Expert/user"
 		target="_blank"
-		>Melde dich bitte an und generiere unter Konto einen neuen API-Schlüssel
+		>Hier API-Schlüssel generieren!
 	</a>
 	<form on:submit={handleSubmit} class="flex flex-row gap-4">
 		<input bind:value={apiKey} class="p-4 rounded-2 shadow-dark shadow-2xl w-full" type="text" />
