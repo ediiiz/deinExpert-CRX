@@ -7,23 +7,38 @@ import obfuscatorPlugin from "vite-plugin-javascript-obfuscator";
 
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig( ({ mode }) => {
+
+    const isProduction = mode === 'production';
+    
+    return {
     plugins: [UnoCSS(), svelte({ emitCss: false }), crx({ manifest }), obfuscatorPlugin({
-        include: ["src/**/*.ts", "src/**/*.js"],
+        include: ["src/**/*.ts", "src/**/*.js, src/**/*.svelte"],
         apply: "build",
-        debugger: true,
+        debugger: false,
         options: {
             optionsPreset: "high-obfuscation",
         }
     })],
+    build: {
+        outDir: isProduction ? "build" : "dev-build",
+        emptyOutDir: true,
+        minify: isProduction ? "terser" : false,
+        terserOptions: {
+            compress: {
+                drop_console: true,
+            },
+            mangle: true,
+        },
+    },
     publicDir: "./src/public",
     // HACK: https://github.com/crxjs/chrome-extension-tools/issues/696
     // https://github.com/crxjs/chrome-extension-tools/issues/746
     server: {
-        port: 5173,
+        port: 5174,
         strictPort: true,
         hmr: {
-            clientPort: 5173,
+            clientPort: 5174,
         },
     },
-});
+}});

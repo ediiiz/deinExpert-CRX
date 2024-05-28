@@ -16,6 +16,7 @@ export enum ProgressStatus {
   ERROR = 'error',
   LOADING = 'loading',
   UPLOADED = 'uploaded',
+  UPLOADING = 'uploading',
 }
 
 export enum SubStatus {
@@ -28,6 +29,7 @@ export enum SubStatus {
   ERROR_UPLOADING_DATA = 'error_uploading_data',
   SUCCESS_SEARCH_COMPLETED = 'success_search_completed',
   SUCCESS_UPLOADED = 'success_uploaded',
+  TRYING_TO_UPLOAD_DATA = 'trying_to_upload_data',
 }
 
 export const productsStore = writable<ProductDataSchema[]>([]);
@@ -50,7 +52,7 @@ export class StoreDataHandler {
   private abortController: AbortController | null = null;
   private isSearchCancelled: boolean = false;
   private awinLink: string | void = undefined;
-  private waitMinutes: number = 60;
+  private waitMinutes: number = 0;
   private productInfo: ProductSchema | undefined = undefined;
   private unsubscribe: () => void;
 
@@ -389,6 +391,12 @@ export class StoreDataHandler {
 
   async uploadData() {
     try {
+      progressStore.update(value => ({
+        ...value,
+        status: ProgressStatus.UPLOADING,
+        subStatus: SubStatus.TRYING_TO_UPLOAD_DATA,
+      }));
+
       const products = this.products;
 
       if (products.length === 0) return;

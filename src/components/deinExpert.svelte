@@ -52,6 +52,10 @@
 			}
 		} else if (status === ProgressStatus.UPLOADED) {
 			toast.success('Preis hochgeladen!');
+		} else if (status === ProgressStatus.CANCELLED) {
+			toast.info('Suche abgebrochen!');
+		} else if (status === ProgressStatus.UPLOADING) {
+			toast.info('Daten werden hochgeladen...');
 		}
 	});
 
@@ -68,6 +72,8 @@
 			(productData.onlineShipment ? productData.onlineShipment[0].price.gross : 0)
 		);
 	}
+
+	$: console.log("DEBUGSTATE", $progressStore.status);
 </script>
 
 <Toaster richColors position="top-right" />
@@ -86,7 +92,7 @@
 			<MessageDisplay {storeDataHandler} />
 		{:else if $progressStore.status === ProgressStatus.ERROR}
 			<ErrorDisplay {storeDataHandler} />
-		{:else if $progressStore.status === ProgressStatus.PROCESSING || $progressStore.status === ProgressStatus.UPLOADED || $progressStore.status === ProgressStatus.CANCELLED}
+		{:else if $progressStore.status === ProgressStatus.PROCESSING || $progressStore.status === ProgressStatus.UPLOADED || $progressStore.status === ProgressStatus.CANCELLED || $progressStore.status === ProgressStatus.UPLOADING}
 			<ProductTable {storeDataHandler} {createAffiliate} {calculatePriceInclShipping} />
 		{/if}
 	</div>
