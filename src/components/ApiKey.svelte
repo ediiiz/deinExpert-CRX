@@ -20,13 +20,18 @@
 >
 	<p class="">Der hinterlegte API-Schlüssel ist falsch oder fehlt.</p>
 	<a
-		class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
+		class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white animate-pulse"
 		href="https://dein.Expert/user"
 		target="_blank"
 		>Hier API-Schlüssel generieren!
 	</a>
 	<form on:submit={handleSubmit} class="flex flex-row gap-4">
-		<input bind:value={apiKey} class="p-4 rounded-2 shadow-dark shadow-2xl w-full" type="text" />
+		<input
+			bind:value={apiKey}
+			placeholder="Schlüssel hier einfügen......"
+			class="p-4 rounded-2 shadow-dark shadow-2xl w-full"
+			type="text"
+		/>
 		<button type="submit" class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white"
 			>Speichern
 		</button>

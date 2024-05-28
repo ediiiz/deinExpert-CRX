@@ -24,7 +24,7 @@ export default defineManifest(async (env) => ({
     },
     content_scripts: [
         {
-            matches: ["https://*.expert.de/shop/*"],
+            matches: ["https://*.expert.de/*"],
             js: ["src/content/index.ts"],
         },
     ],

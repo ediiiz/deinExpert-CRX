@@ -24,22 +24,22 @@
 				{#each $productsStore as product (product.store.id)}
 					<tr class="text-center" transition:fade={{ duration: 200 }}>
 						{#if !product.itemOnDisplay}
-							<td>{calculatePriceInclShipping(product) || 'N/A'}€</td>
+							<td>{calculatePriceInclShipping(product).toFixed(2) || 'N/A'}€</td>
 							<td>
 								<button class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white">
 									<a
 										href={createAffiliate(storeDataHandler.getAwinLink, product.store.id)}
-										target="_blank">Link</a
+										target="_blank">Link*</a
 									>
 								</button>
 							</td>
 						{:else}
-							<td class="bg-orange-400">{calculatePriceInclShipping(product) || 'N/A'}€</td>
+							<td class="bg-orange-400">{calculatePriceInclShipping(product).toFixed(2) || 'N/A'}€</td>
 							<td class="bg-orange-400">
 								<button class="p-4 bg-dark rounded-2 shadow-dark shadow-2xl text-white">
 									<a
 										href={createAffiliate(storeDataHandler.getAwinLink, product.store.id)}
-										target="_blank">Link</a
+										target="_blank">Link*</a
 									>
 								</button>
 							</td>

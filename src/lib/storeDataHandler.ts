@@ -52,7 +52,7 @@ export class StoreDataHandler {
   private abortController: AbortController | null = null;
   private isSearchCancelled: boolean = false;
   private awinLink: string | void = undefined;
-  private waitMinutes: number = 0;
+  private waitMinutes: number = 60;
   private productInfo: ProductSchema | undefined = undefined;
   private unsubscribe: () => void;
 

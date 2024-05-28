@@ -1,9 +1,7 @@
 <script lang="ts">
-	import { fade, fly, slide } from 'svelte/transition';
+	import { fade } from 'svelte/transition';
 	import DeinExpert from './deinExpert.svelte';
 	import { onMount } from 'svelte';
-
-	console.log(window.location.pathname);
 
 	function switchModal() {
 		state == 'open' ? (state = 'close') : (state = 'open');
@@ -62,7 +60,6 @@
 		}
 	}
 
-	// Call the function to remove the parameters and reload
 	onMount(() => {
 		setCookieFromUrlParam();
 		removeUrlParametersAndReload();

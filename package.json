@@ -30,6 +30,7 @@
     "vite": "^4.5.2"
   },
   "dependencies": {
+    "svelte-routing": "^2.13.0",
     "svelte-sonner": "^0.3.6",
     "vite-plugin-javascript-obfuscator": "^3.0.3",
     "zod": "^3.23.8"
