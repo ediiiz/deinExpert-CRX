@@ -73,7 +73,7 @@
 		);
 	}
 
-	$: console.log("DEBUGSTATE", $progressStore.status);
+	$: console.log('DEBUGSTATE', $progressStore.status);
 </script>
 
 <Toaster richColors position="top-right" />
@@ -90,10 +90,10 @@
 		<ControlButton {init} {storeDataHandler} />
 		{#if $progressStore.status === ProgressStatus.READY}
 			<MessageDisplay {storeDataHandler} />
+		{:else if $progressStore.status === ProgressStatus.PROCESSING || $progressStore.status === ProgressStatus.UPLOADED || $progressStore.status === ProgressStatus.CANCELLED || $progressStore.status === ProgressStatus.UPLOADING || $progressStore.subStatus === SubStatus.ERROR_UPLOADING_DATA}
+			<ProductTable {storeDataHandler} {createAffiliate} {calculatePriceInclShipping} />
 		{:else if $progressStore.status === ProgressStatus.ERROR}
 			<ErrorDisplay {storeDataHandler} />
-		{:else if $progressStore.status === ProgressStatus.PROCESSING || $progressStore.status === ProgressStatus.UPLOADED || $progressStore.status === ProgressStatus.CANCELLED || $progressStore.status === ProgressStatus.UPLOADING}
-			<ProductTable {storeDataHandler} {createAffiliate} {calculatePriceInclShipping} />
 		{/if}
 	</div>
 </div>

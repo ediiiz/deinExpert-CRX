@@ -2,9 +2,10 @@ import { writable } from 'svelte/store';
 import { cashbackSchema, productPriceSchema, productSchema, storeSchema, type ProductDataSchema, type ProductSchema, type StoreSchema, } from './schema';
 
 const DEINEXPERT_HOST: string = 'https://dein.expert'
-const GET_EXPERT_ARTICLE_URL: string = 'https://production.brntgs.expert.de/api/neo/internal-pub-service/getArticleData'
 const DEINEXPERT_API_URL: string = `${DEINEXPERT_HOST}/api`
-const EXPERT_STORES: string = "https://shop.brntgs.expert.de/api/storeFinder?maxResults=1000"
+const GET_EXPERT_ARTICLE_URL: string = 'https://production.brntgs.expert.de/api/neo/internal-pub-service/getArticleData'
+const STORE_FINDER_URL: string = "https://production.brntgs.expert.de/api/storeFinder?maxResults=1000"
+const WEBCODE_SEARCH_URL: string = 'https://production.brntgs.expert.de/api/search/article/webcode/'
 
 export enum ProgressStatus {
   INITIAL = 'initial',
@@ -74,7 +75,14 @@ export class StoreDataHandler {
   }
 
   async expertStores() {
-    const data = storeSchema.safeParse(await fetch(EXPERT_STORES).then((response) => response.json()).catch(() => undefined))
+    const fetchStores = async () => {
+      const response = await fetch(STORE_FINDER_URL)
+      return response.json()
+    }
+
+    const data = storeSchema.safeParse(
+      await fetchStores().catch(() => undefined)
+    )
     return data
   }
 
@@ -214,7 +222,7 @@ export class StoreDataHandler {
   }
 
   private getProductInfoUrl(webcode: string) {
-    return `https://shop.brntgs.expert.de/api/search/article/webcode/${webcode}`
+    return `${WEBCODE_SEARCH_URL}${webcode}`
   }
 
   private async getProductInfo(webcode: string) {

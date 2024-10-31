@@ -1,11 +1,16 @@
 <script lang="ts">
-	import { ProgressStatus, StoreDataHandler, progressStore } from '../lib/storeDataHandler';
+	import {
+		ProgressStatus,
+		StoreDataHandler,
+		SubStatus,
+		progressStore
+	} from '../lib/storeDataHandler';
 
 	export let init;
 	export let storeDataHandler: StoreDataHandler;
 
 	function restart() {
-		progressStore.update(store => ({
+		progressStore.update((store) => ({
 			...store,
 			status: ProgressStatus.READY
 		}));
@@ -27,7 +32,7 @@
 	<button disabled class="bg-dark z-10 p-4 text-white rounded-2 bg-op-50">
 		Daten werden hochgeladen...
 	</button>
-{:else if $progressStore.status === ProgressStatus.UPLOADED || $progressStore.status === ProgressStatus.CANCELLED}
+{:else if $progressStore.status === ProgressStatus.UPLOADED || $progressStore.status === ProgressStatus.CANCELLED || ($progressStore.subStatus === SubStatus.ERROR_UPLOADING_DATA && $progressStore.status == ProgressStatus.ERROR)}
 	<button class="bg-dark z-10 p-4 text-white rounded-2 animate-pulse" on:click={restart}>
 		Suche erneut starten!
 	</button>

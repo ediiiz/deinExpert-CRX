@@ -7,38 +7,39 @@ import obfuscatorPlugin from "vite-plugin-javascript-obfuscator";
 
 
 // https://vitejs.dev/config/
-export default defineConfig( ({ mode }) => {
+export default defineConfig(({ mode }) => {
 
     const isProduction = mode === 'production';
-    
+
     return {
-    plugins: [UnoCSS(), svelte({ emitCss: false }), crx({ manifest }), obfuscatorPlugin({
-        include: ["src/**/*.ts", "src/**/*.js, src/**/*.svelte"],
-        apply: "build",
-        debugger: true,
-        options: {
-            optionsPreset: "high-obfuscation",
-        }
-    })],
-    build: {
-        outDir: isProduction ? "build" : "dev-build",
-        emptyOutDir: true,
-        minify: isProduction ? "terser" : false,
-        terserOptions: {
-            compress: {
-                drop_console: true,
+        plugins: [UnoCSS(), svelte({ emitCss: false }), crx({ manifest }), obfuscatorPlugin({
+            include: ["src/**/*.ts", "src/**/*.js"],
+            apply: "build",
+            debugger: true,
+            options: {
+                optionsPreset: "high-obfuscation",
+            }
+        })],
+        build: {
+            outDir: isProduction ? "build" : "dev-build",
+            emptyOutDir: true,
+            minify: isProduction ? "terser" : false,
+            terserOptions: {
+                compress: {
+                    drop_console: true,
+                },
+                mangle: true,
             },
-            mangle: true,
         },
-    },
-    publicDir: "./src/public",
-    // HACK: https://github.com/crxjs/chrome-extension-tools/issues/696
-    // https://github.com/crxjs/chrome-extension-tools/issues/746
-    server: {
-        port: 5174,
-        strictPort: true,
-        hmr: {
-            clientPort: 5174,
+        publicDir: "./src/public",
+        // HACK: https://github.com/crxjs/chrome-extension-tools/issues/696
+        // https://github.com/crxjs/chrome-extension-tools/issues/746
+        server: {
+            port: 5174,
+            strictPort: true,
+            hmr: {
+                clientPort: 5174,
+            },
         },
-    },
-}});
+    }
+});
